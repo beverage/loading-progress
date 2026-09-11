@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+    <LoadingProgress.InGame.WorldGeneration>Generating world</LoadingProgress.InGame.WorldGeneration>
+    <LoadingProgress.InGame.PlanetRegeneration>Regenerating planet</LoadingProgress.InGame.PlanetRegeneration>
+    <LoadingProgress.InGame.NewGameMapGeneration>Generating map</LoadingProgress.InGame.NewGameMapGeneration>
+    <LoadingProgress.InGame.SaveLoading>Loading game</LoadingProgress.InGame.SaveLoading>
+    <LoadingProgress.InGame.EncounterMapGeneration>Generating map</LoadingProgress.InGame.EncounterMapGeneration>
+    <LoadingProgress.InGame.EncounterMapGenerationStatic>Generating map</LoadingProgress.InGame.EncounterMapGenerationStatic>
+
+    <LoadingProgress.InGame.Phase.WorldGeneration_SetupSteps>Setting up</LoadingProgress.InGame.Phase.WorldGeneration_SetupSteps>
+    <LoadingProgress.InGame.Phase.WorldGeneration_LayerSteps>Generating layers</LoadingProgress.InGame.Phase.WorldGeneration_LayerSteps>
+    <LoadingProgress.InGame.Phase.WorldGeneration_Deferred>Regenerating renderer</LoadingProgress.InGame.Phase.WorldGeneration_Deferred>
+
+    <LoadingProgress.InGame.Phase.PlanetRegeneration_RegeneratingLayers>Regenerating layers</LoadingProgress.InGame.Phase.PlanetRegeneration_RegeneratingLayers>
+
+    <LoadingProgress.InGame.Phase.NewGameMapGeneration_SetUp>Setting up map</LoadingProgress.InGame.Phase.NewGameMapGeneration_SetUp>
+    <LoadingProgress.InGame.Phase.NewGameMapGeneration_GenSteps>Generating map</LoadingProgress.InGame.Phase.NewGameMapGeneration_GenSteps>
+    <LoadingProgress.InGame.Phase.NewGameMapGeneration_Finalize>Finalizing map</LoadingProgress.InGame.Phase.NewGameMapGeneration_Finalize>
+    <LoadingProgress.InGame.Phase.NewGameMapGeneration_PostInit>Finishing up</LoadingProgress.InGame.Phase.NewGameMapGeneration_PostInit>
+    <LoadingProgress.InGame.Phase.NewGameMapGeneration_Deferred>Regenerating renderer</LoadingProgress.InGame.Phase.NewGameMapGeneration_Deferred>
+
+    <LoadingProgress.InGame.Phase.SaveLoading_ReadingFile>Reading file</LoadingProgress.InGame.Phase.SaveLoading_ReadingFile>
+    <LoadingProgress.InGame.Phase.SaveLoading_World>Loading world</LoadingProgress.InGame.Phase.SaveLoading_World>
+    <LoadingProgress.InGame.Phase.SaveLoading_Maps>Loading maps</LoadingProgress.InGame.Phase.SaveLoading_Maps>
+    <LoadingProgress.InGame.Phase.SaveLoading_Initializing>Initializing game</LoadingProgress.InGame.Phase.SaveLoading_Initializing>
+    <LoadingProgress.InGame.Phase.SaveLoading_Spawning>Spawning things</LoadingProgress.InGame.Phase.SaveLoading_Spawning>
+    <LoadingProgress.InGame.Phase.SaveLoading_Finishing>Finishing up</LoadingProgress.InGame.Phase.SaveLoading_Finishing>
+    <LoadingProgress.InGame.Phase.SaveLoading_Deferred>Regenerating renderer</LoadingProgress.InGame.Phase.SaveLoading_Deferred>
+
+    <LoadingProgress.InGame.Phase.EncounterMapGeneration_SetUp>Setting up map</LoadingProgress.InGame.Phase.EncounterMapGeneration_SetUp>
+    <LoadingProgress.InGame.Phase.EncounterMapGeneration_GenSteps>Generating map</LoadingProgress.InGame.Phase.EncounterMapGeneration_GenSteps>
+    <LoadingProgress.InGame.Phase.EncounterMapGeneration_Finalize>Finalizing map</LoadingProgress.InGame.Phase.EncounterMapGeneration_Finalize>
+    <LoadingProgress.InGame.Phase.EncounterMapGeneration_PostInit>Finishing up</LoadingProgress.InGame.Phase.EncounterMapGeneration_PostInit>
+    <LoadingProgress.InGame.Phase.EncounterMapGeneration_SpawningColonists>Spawning colonists</LoadingProgress.InGame.Phase.EncounterMapGeneration_SpawningColonists>
+    <LoadingProgress.InGame.Phase.EncounterMapGeneration_Deferred>Regenerating renderer</LoadingProgress.InGame.Phase.EncounterMapGeneration_Deferred>
+
+    <LoadingProgress.InGame.Phase.EncounterMapGenerationStatic_Generating>Generating map</LoadingProgress.InGame.Phase.EncounterMapGenerationStatic_Generating>
+</LanguageData>

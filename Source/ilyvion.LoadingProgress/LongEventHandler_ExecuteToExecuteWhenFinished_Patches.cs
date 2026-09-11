@@ -10,10 +10,14 @@ internal static partial class LongEventHandler_ExecuteToExecuteWhenFinished_Patc
 
     private static bool Prepare()
     {
-        if (!LoadingProgressMod.Settings.PatchInitialization)
+        if (
+            !LoadingProgressMod.Settings.PatchInitialization
+            && !LoadingProgressMod.Settings.PatchInGameDeferredRepaint
+        )
         {
             LoadingProgressMod.Message(
-                "Patching of initialization code is disabled " + "in the settings, skipping patch."
+                "Patching of initialization code and in-game deferred-block repaint are both "
+                    + "disabled in the settings, skipping patch."
             );
             return false;
         }
@@ -37,6 +41,48 @@ internal static partial class LongEventHandler_ExecuteToExecuteWhenFinished_Patc
             });
             return false;
         }
+
+        if (
+            LongEventHandler.toExecuteWhenFinished.Count > 0
+            && LoadingProgressWindow.CurrentStage == LoadingStage.Finished
+            && LoadingProgressMod.Settings.PatchInGameDeferredRepaint
+            && InGameLoadingSession.IsActive
+            && InGameDeferredActionReplacement.ContainsKnownSlowAction(
+                LongEventHandler.toExecuteWhenFinished
+            )
+        )
+        {
+            // Vanilla's callers (UpdateCurrentAsynchronousEvent etc.) call this method, the
+            // event's callback and null out currentEvent all within the same Update(); since the
+            // replacement below spreads toExecuteWhenFinished across multiple frames, the
+            // callback is pulled out and null'd here so the vanilla caller's own
+            // callback?.Invoke() right after this method returns becomes a no-op. It's invoked
+            // for real from InGameDeferredActionReplacement.ExecuteToExecuteWhenFinished, only
+            // once every deferred action has actually finished - preserving vanilla's "deferred
+            // actions complete before the callback runs" order even though it's now spread
+            // across frames. currentEvent itself still gets null'd early by the vanilla caller
+            // regardless, same as it already does for the startup redirect above;
+            // LongEventHandlerPrependQueue keeps the event queue non-empty across that gap so no
+            // session-end/repaint hiccup results from it.
+            var callback = LongEventHandler.currentEvent?.callback;
+            // IDE0031 and IDE0058 disagree over whether this null check should collapse into a
+            // null-conditional assignment; the explicit form satisfies both.
+#pragma warning disable IDE0031
+            if (LongEventHandler.currentEvent != null)
+            {
+                LongEventHandler.currentEvent.callback = null;
+            }
+#pragma warning restore IDE0031
+            Utilities.LongEventHandlerPrependQueue(() =>
+            {
+                LongEventHandler.QueueLongEvent(
+                    InGameDeferredActionReplacement.ExecuteToExecuteWhenFinished(callback),
+                    InGameLoadingSession.DeferredRedirectEventTextKey
+                );
+            });
+            return false;
+        }
+
         return true;
     }
 

@@ -35,5 +35,14 @@
         <Publicize Include="Assembly-CSharp:Verse.DirectXmlCrossRefLoader.wantedRefs" />
         <Publicize Include="Assembly-CSharp:Verse.PlayDataLoader.ResetStaticDataPre" />
         <Publicize Include="Assembly-CSharp:Verse.PlayDataLoader.ResetStaticDataPost" />
+        <Publicize Include="Assembly-CSharp:Verse.LongEventHandler.levelLoadOp" />
+        <Publicize Include="Assembly-CSharp:Verse.LongEventHandler.eventThread" />
+        <Publicize Include="Assembly-CSharp:Verse.MapGenerator.tmpGenSteps" />
+        <Publicize Include="Assembly-CSharp:Verse.MapDrawer.EnsureGlobalLayersInitialized" />
+        <Publicize Include="Assembly-CSharp:Verse.MapDrawer.global" />
+        <Publicize Include="Assembly-CSharp:Verse.MapDrawer.sections" />
+        <Publicize Include="Assembly-CSharp:Verse.MapDrawer.SectionCount" />
+        <Publicize Include="Assembly-CSharp:Verse.PostLoadIniter.saveablesToPostLoad" />
+        <Publicize Include="Assembly-CSharp:Verse.Map.loadedFullThings" />
     </ItemGroup>
 </Project>

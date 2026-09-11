@@ -201,6 +201,16 @@ internal static class Utilities
         return potentiallyProblematicPatches;
     }
 
+    // A queued event's own UseStandardWindow flag only says the standard-window path is
+    // *allowed*; drawing through it still needs a live UI root and window stack (both can be
+    // absent for a frame around a scene transition), in which case falling back to drawing
+    // directly is the only option.
+    public static bool ShouldUseStandardWindow(
+        bool eventUseStandardWindow,
+        bool uiRootAvailable,
+        bool windowStackAvailable
+    ) => eventUseStandardWindow && uiRootAvailable && windowStackAvailable;
+
     public static string FormatDuration(TimeSpan t)
     {
         if (t < TimeSpan.Zero)

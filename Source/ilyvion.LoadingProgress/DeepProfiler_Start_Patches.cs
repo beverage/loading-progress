@@ -40,7 +40,15 @@ internal static class DeepProfiler_Start_Patches
         }
         else
         {
-            LoadingProgressWindow.CurrentLoadingActivity = label;
+            // Once startup is finished, CurrentLoadingActivity's StageRules never match anything
+            // again (the list is pruned down to just the Finished-stage rule by then), so calling
+            // its setter for every in-game label would still take the dev-mode unmatched-activity
+            // lock for nothing on every DeepProfiler.Start() in the game, session or not.
+            if (LoadingProgressWindow.CurrentStage != LoadingStage.Finished)
+            {
+                LoadingProgressWindow.CurrentLoadingActivity = label;
+            }
+            InGameLoadingSession.OnProfilerLabel(label);
         }
         DeepProfilerLabelStack.Labels.Push(label);
     }
@@ -70,6 +78,7 @@ internal static class DeepProfiler_End_Patches
                 // the same item) since some parent labels also match those patterns.
                 LoadingProgressWindow.SetCurrentLoadingActivityRaw(parentLabel);
             }
+            InGameLoadingSession.OnProfilerLabelRestored(parentLabel);
         }
     }
 }

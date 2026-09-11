@@ -18,6 +18,20 @@ internal sealed class Settings : ModSettings
         set => _patchReloadContent = value;
     }
 
+    private bool _showInGameLoadingProgress = true;
+    public bool ShowInGameLoadingProgress
+    {
+        get => _showInGameLoadingProgress;
+        set => _showInGameLoadingProgress = value;
+    }
+
+    private bool _patchInGameDeferredRepaint = true;
+    public bool PatchInGameDeferredRepaint
+    {
+        get => _patchInGameDeferredRepaint;
+        set => _patchInGameDeferredRepaint = value;
+    }
+
     private LoadingWindowPlacement _loadingWindowPlacement = LoadingWindowPlacement.Middle;
     public LoadingWindowPlacement LoadingWindowPlacement
     {
@@ -175,6 +189,8 @@ internal sealed class Settings : ModSettings
 
         Scribe_Values.Look(ref _patchInitialization, "patchInitialization", true);
         Scribe_Values.Look(ref _patchReloadContent, "patchReloadContent", true);
+        Scribe_Values.Look(ref _showInGameLoadingProgress, "showInGameLoadingProgress", true);
+        Scribe_Values.Look(ref _patchInGameDeferredRepaint, "patchInGameDeferredRepaint", true);
         Scribe_Values.Look(
             ref _loadingWindowPlacement,
             "loadingWindowPlacement",
@@ -250,6 +266,12 @@ internal sealed class Settings : ModSettings
         );
 
         listingStandard.CheckboxLabeled(
+            "LoadingProgress.PatchInGameDeferredRepaint".Translate(),
+            ref _patchInGameDeferredRepaint,
+            "LoadingProgress.PatchInGameDeferredRepaint.Tip".Translate()
+        );
+
+        listingStandard.CheckboxLabeled(
             "LoadingProgress.LastLoadingTime".Translate(),
             ref _showLastLoadingTime,
             "LoadingProgress.LastLoadingTime.Tip".Translate()
@@ -320,6 +342,12 @@ internal sealed class Settings : ModSettings
                 "LoadingProgress.ShowBaseGameOffThreadImpact.Tip".Translate()
             );
         }
+
+        listingStandard.CheckboxLabeled(
+            "LoadingProgress.ShowInGameLoadingProgress".Translate(),
+            ref _showInGameLoadingProgress,
+            "LoadingProgress.ShowInGameLoadingProgress.Tip".Translate()
+        );
 
         listingStandard.ColorPicker(
             "LoadingProgress.ProgressBarColor",

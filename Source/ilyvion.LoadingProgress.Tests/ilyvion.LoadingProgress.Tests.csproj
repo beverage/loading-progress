@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>ilyvion.LoadingProgress.Tests</RootNamespace>
+        <AssemblyName>ilyvion.LoadingProgress.Tests</AssemblyName>
+    </PropertyGroup>
+    <!--
+        Dev-only test assembly, built and run in-game via RimTest Redux (see
+        https://github.com/ilyvion/rimtest-redux). It's listed in ilyvion.LoadingProgress.sln so
+        it always builds locally (default Configuration is Debug), but
+        ilyvion.LoadingProgress.sln deliberately omits a Release|Any CPU.Build.0 line for this
+        project's GUID, so a Release-configuration build (what CI/release always use) skips
+        building it entirely; its output never lands in a shipped release.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\ilyvion.LoadingProgress\ilyvion.LoadingProgress.csproj">
+            <CopyLocal>False</CopyLocal>
+            <Private>false</Private>
+        </ProjectReference>
+        <ProjectReference Include="$(ProjectDependenciesBasePath)\RimTest\Source\RimTestRedux\RimTestRedux.csproj">
+            <CopyLocal>False</CopyLocal>
+            <Private>false</Private>
+        </ProjectReference>
+    </ItemGroup>
+</Project>

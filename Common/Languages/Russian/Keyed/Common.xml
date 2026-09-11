@@ -2,6 +2,7 @@
 <LanguageData>
     <LoadingProgress.Title>Прогресс загрузки</LoadingProgress.Title>
     <LoadingProgress.ExecuteToExecuteWhenFinished>Прогресс загрузки: Выполнение задач отложенной инициализации</LoadingProgress.ExecuteToExecuteWhenFinished>
+    <LoadingProgress.InGameExecuteToExecuteWhenFinished>Прогресс загрузки: Регенерация рендера</LoadingProgress.InGameExecuteToExecuteWhenFinished>
     <LoadingProgress.CallAll>Прогресс загрузки: Вызов всех статических конструкторов</LoadingProgress.CallAll>
     <LoadingProgress.ModHashChanged>(Список модов изменился с последнего запуска игры; оценка может быть неточной.)</LoadingProgress.ModHashChanged>
     <LoadingProgress.MemoryUsage>Куча: {0}  ·  Процесс: {1}</LoadingProgress.MemoryUsage>

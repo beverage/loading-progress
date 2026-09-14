@@ -27,7 +27,5 @@
              startup impact tracking. Also, Loading Progress now has its own startup impact
              tracking, so it's doing double duty. -->
         <li>assassinsbro.startupimpactcontinued</li>
-        <!-- Overrides the way the game loads and renders its main menu in a way that interferes with Loading Progress -->
-        <li>arandomkiwi.rimthemes</li>
     </incompatibleWith>
 </ModMetaData>

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-14
+
 ### Added
 
 - The loading window now also appears during in-game world generation, new-game map generation, loading a save, settling on a tile or setting up a camp from a caravan, and the planet's map mesh regeneration (e.g. right after generating a new world or opening the world map after loading a save), showing the current activity and elapsed time. Where possible, it shows the current phase (e.g. reading the file, loading maps, spawning things, spawning your colonists onto a new map) along with a progress bar tracking how far along that phase is, or, for map mesh regeneration, how many of the planet's layers have finished. For map generation that freezes the game with no opportunity to show live progress, such as arriving at a caravan site, being attacked while away from home, ambushes, caravan meetings and demands, peace talks, escaping by ship, transport pods arriving, gravship landings, and the new colony quest, the loading window instead briefly appears without live progress.
@@ -305,7 +307,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First implementation of the mod.
 
-[Unreleased]: https://github.com/ilyvion/loading-progress/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/ilyvion/loading-progress/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/ilyvion/loading-progress/compare/v0.14.0..v0.15.0
 [0.14.0]: https://github.com/ilyvion/loading-progress/compare/v0.13.2..v0.14.0
 [0.13.2]: https://github.com/ilyvion/loading-progress/compare/v0.13.1..v0.13.2
 [0.13.1]: https://github.com/ilyvion/loading-progress/compare/v0.13.0..v0.13.1

@@ -6,11 +6,15 @@ The progress window isn't just for startup anymore. It now also appears during i
 [h2]Loading time impact tracking[/h2]
 Loosely based on the mod Startup Impact, the mod can track and show what mods are having what impact on your loading times. Click the loading time summary text in the bottom-right corner of your screen on the main menu to see the stats, including a sortable, filterable per-mod breakdown, a stacked comparison bar, and an option to export a self-contained HTML report you can open in any browser or share without RimWorld running. This feature is disabled by default; enable it in the mod's settings if you'd like to use it.
 
-[h1]Mod incompatibility[/h1]
+[h1]Mod compatibility[/h1]
+
+[h2]Known incompatibilities[/h2]
 [list]
-[*] RimThemes makes this mod useless, because it just covers the whole loading process with a splash screen.
-[*] Startup Impact Continued messes with the startup process in ways that ruin this mod's progress and startup impact tracking, and this mod now has its own startup impact tracking anyway, so it's doing double duty.
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=1668983184]RimThemes[/url] — Makes this mod useless, because it just covers the whole loading process with a splash screen.
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3544131315]Startup Impact Continued[/url] — Messes with the startup process in ways that ruin this mod's progress and startup impact tracking, and this mod now has its own startup impact tracking anyway, so it's doing double duty.
 [/list]
+
+[h1]Troubleshooting[/h1]
 
 If you encounter any issues, try disabling the [b]Enable patching of initialization code[/b] setting of Loading Progress to remove the most likely source of incompatibility. If that still doesn't work (and frankly, even if it does), please leave me a bug report so I can address the problem.
 

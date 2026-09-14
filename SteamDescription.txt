@@ -1,13 +1,15 @@
-[b]Loading Progress[/b] is a RimWorld mod that adds a detailed loading progress window to the game. It visually tracks each stage of RimWorld's startup process, showing which step is currently running. This makes waiting for RimWorld to start slightly more interesting. The mod is especially useful for those with large mod lists. No configuration required—just install and enjoy better insight into your game's loading process!
+[b]Loading Progress[/b] is a RimWorld mod that adds a detailed loading progress window to the game. It visually tracks each stage of RimWorld's startup process, showing which step is currently running, along with your managed heap size and the game process's total memory usage next to the title. This makes waiting for RimWorld to start slightly more interesting. The mod is especially useful for those with large mod lists. No configuration required—just install and enjoy better insight into your game's loading process!
 
-[h2]New with version v0.9 -- Loading time impact tracking[/h2]
-Loosely based on the mod Startup impact, the mod now tracks and can show what mods are having what impact on your loading times. Click the loading time summary text in the bottom-right corner of your screen on the main menu to see the stats!
+[h2]In-game loading progress[/h2]
+The progress window isn't just for startup anymore. It now also appears during in-game world generation, new-game map generation, loading a save, settling or setting up camp from a caravan, and the planet's map mesh regeneration, showing the current activity, elapsed time and, where possible, a progress bar for the current phase. For situations that freeze the game with no opportunity to show live progress (caravan arrivals, ambushes, transport pods, gravship landings, and similar), the window instead briefly appears without live progress.
 
-Since the initial release of the feature caused issues for people, the feature is disabled by default. I believe the latest version, 0.9.3, has fixed the issue, but I'm leaving the feature disabled by default for the time being. You should feel safe to try enabling it though, but if you run into any issues after doing so, please come give me a bug report so I can address it!
+[h2]Loading time impact tracking[/h2]
+Loosely based on the mod Startup Impact, the mod can track and show what mods are having what impact on your loading times. Click the loading time summary text in the bottom-right corner of your screen on the main menu to see the stats, including a sortable, filterable per-mod breakdown, a stacked comparison bar, and an option to export a self-contained HTML report you can open in any browser or share without RimWorld running. This feature is disabled by default; enable it in the mod's settings if you'd like to use it.
 
 [h1]Mod incompatibility[/h1]
 [list]
 [*] RimThemes makes this mod useless, because it just covers the whole loading process with a splash screen.
+[*] Startup Impact Continued messes with the startup process in ways that ruin this mod's progress and startup impact tracking, and this mod now has its own startup impact tracking anyway, so it's doing double duty.
 [/list]
 
 If you encounter any issues, try disabling the [b]Enable patching of initialization code[/b] setting of Loading Progress to remove the most likely source of incompatibility. If that still doesn't work (and frankly, even if it does), please leave me a bug report so I can address the problem.

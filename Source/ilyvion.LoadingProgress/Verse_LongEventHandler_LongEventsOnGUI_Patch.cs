@@ -248,9 +248,7 @@ internal static class ExtraLongEventUIWindowLayout
 //   earlier) but before any real window, matching where a normal window would draw.
 internal static class Verse_LongEventHandler_DrawOwnWindow_Patch
 {
-    // Also consulted by Verse_LongEventHandler_DrawLongEventWindow_Patch to suppress vanilla's own
-    // status box whenever this replaces it, so the two don't both end up on screen at once.
-    internal static bool ShouldReplaceVanillaWindow(out bool useInGameWindow)
+    internal static bool ShouldDrawOwnWindow(out bool useInGameWindow)
     {
         var currentEvent = LongEventHandler.currentEvent;
         if (currentEvent == null || currentEvent.forceHideUI)
@@ -267,7 +265,7 @@ internal static class Verse_LongEventHandler_DrawOwnWindow_Patch
 
     internal static void Draw()
     {
-        if (!ShouldReplaceVanillaWindow(out var useInGameWindow))
+        if (!ShouldDrawOwnWindow(out var useInGameWindow))
         {
             return;
         }
@@ -352,19 +350,10 @@ internal static class Verse_LongEventHandler_DrawOwnWindow_Patch
     }
 }
 
-// Suppresses vanilla's own status box whenever Verse_LongEventHandler_DrawOwnWindow_Patch is about
-// to draw its own replacement content instead, so the two don't both end up on screen at once.
-[HarmonyPatch(typeof(LongEventHandler), "DrawLongEventWindow")]
-internal static class Verse_LongEventHandler_DrawLongEventWindow_Patch
-{
-    internal static bool Prefix() =>
-        !Verse_LongEventHandler_DrawOwnWindow_Patch.ShouldReplaceVanillaWindow(out _);
-}
-
-// Draws our window for LongEventsOnGUI's DrawLongEventWindow branch - see
-// Verse_LongEventHandler_DrawOwnWindow_Patch's comment for why this can't be spliced into
-// LongEventsOnGUI itself like the other branch. WindowStackOnGUI runs every frame regardless of
-// any long event; Draw() itself is a no-op whenever ShouldReplaceVanillaWindow is false.
+// Draws our window alongside vanilla's own status box for LongEventsOnGUI's DrawLongEventWindow
+// branch - see Verse_LongEventHandler_DrawOwnWindow_Patch's comment for why this can't be spliced
+// into LongEventsOnGUI itself like the other branch. WindowStackOnGUI runs every frame regardless
+// of any long event; Draw() itself is a no-op whenever ShouldDrawOwnWindow is false.
 [HarmonyPatch(typeof(WindowStack), nameof(WindowStack.WindowStackOnGUI))]
 internal static class Verse_WindowStack_WindowStackOnGUI_Patch
 {

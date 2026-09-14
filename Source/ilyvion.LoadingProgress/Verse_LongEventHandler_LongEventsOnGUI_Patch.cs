@@ -230,31 +230,44 @@ internal static class ExtraLongEventUIWindowLayout
     }
 }
 
-// Vanilla's own standard window (LongEventHandler.DrawLongEventWindow, ID 62893994) registers
-// itself via Find.WindowStack.ImmediateWindow directly from LongEventsOnGUI's own top-level call,
-// not from inside another window's draw callback; WindowStack.WindowStackOnGUI takes a fresh
-// snapshot of its window list once per frame before drawing, and a window whose ID is being
-// registered for the very first time only gets added to the live list, not that already-taken
-// snapshot - so registering from inside a nested callback silently defers its first-ever draw to
-// the following frame. That one-frame lag is invisible for a session that repaints for many
-// frames, but this draw needs to be as top-level as vanilla's own status window is for it to
-// reliably land on the one frame a synchronous session ever gets before the game freezes: hence
-// this being a postfix on LongEventsOnGUI.
-[HarmonyPatch(typeof(LongEventHandler), nameof(LongEventHandler.LongEventsOnGUI))]
+// Invoked from two places, depending on which of LongEventsOnGUI's two branches vanilla takes for
+// the current event (Verse_LongEventHandler_LongEventsOnGUI_Patch's transpiler / this file's
+// WindowStack.WindowStackOnGUI Prefix below):
+// - The raw-content branch (no game/world, or UseStandardWindow false): LongEventsOnGUI draws its
+//   own full-screen background, then its own content, then calls TooltipHandler.DoTooltipGUI()
+//   directly, all within its own body - so this is spliced in via a transpiler right after that
+//   content call, landing after the background paint but before the tooltip call. A Prefix on the
+//   whole method would run before the background paint and get covered by it; a Postfix would run
+//   after the tooltip call and always composite above it.
+// - The DrawLongEventWindow branch (UseStandardWindow true, e.g. during map generation with the
+//   world view visible): in this case Root.OnGUI goes on to call uiRoot.UIRootOnGUI() in the same
+//   frame, which draws the world (including its object icons) and then the real window stack,
+//   after LongEventsOnGUI has already returned. Splicing in right after DrawLongEventWindow, like
+//   the other branch, would draw before the world and get painted over by it; a Prefix on
+//   WindowStack.WindowStackOnGUI instead lands after the world (and after the tooltip, drawn even
+//   earlier) but before any real window, matching where a normal window would draw.
 internal static class Verse_LongEventHandler_DrawOwnWindow_Patch
 {
-    private static void Postfix()
+    // Also consulted by Verse_LongEventHandler_DrawLongEventWindow_Patch to suppress vanilla's own
+    // status box whenever this replaces it, so the two don't both end up on screen at once.
+    internal static bool ShouldReplaceVanillaWindow(out bool useInGameWindow)
     {
         var currentEvent = LongEventHandler.currentEvent;
         if (currentEvent == null || currentEvent.forceHideUI)
         {
-            return;
+            useInGameWindow = false;
+            return false;
         }
 
-        var useInGameWindow =
+        useInGameWindow =
             LoadingProgressWindow.CurrentStage == LoadingStage.Finished
             && InGameLoadingSession.IsActive;
-        if (LoadingProgressWindow.CurrentStage == LoadingStage.Finished && !useInGameWindow)
+        return LoadingProgressWindow.CurrentStage != LoadingStage.Finished || useInGameWindow;
+    }
+
+    internal static void Draw()
+    {
+        if (!ShouldReplaceVanillaWindow(out var useInGameWindow))
         {
             return;
         }
@@ -305,34 +318,15 @@ internal static class Verse_LongEventHandler_DrawOwnWindow_Patch
             loadingProgressWindowSize.y
         );
 
-        var useStandardWindow = Utilities.ShouldUseStandardWindow(
-            LongEventHandler.currentEvent.UseStandardWindow,
-            Find.UIRoot != null,
-            Find.WindowStack != null
-        );
-        if (!useStandardWindow)
+        Widgets.DrawShadowAround(rect);
+        Widgets.DrawWindowBackground(rect);
+        if (useInGameWindow)
         {
-            Widgets.DrawShadowAround(rect);
-            Widgets.DrawWindowBackground(rect);
-            if (useInGameWindow)
-            {
-                InGameLoadingWindow.DrawContents(rect);
-            }
-            else
-            {
-                LoadingProgressWindow.DrawContents(rect);
-            }
+            InGameLoadingWindow.DrawContents(rect);
         }
         else
         {
-            if (useInGameWindow)
-            {
-                InGameLoadingWindow.DrawWindow(rect);
-            }
-            else
-            {
-                LoadingProgressWindow.DrawWindow(rect);
-            }
+            LoadingProgressWindow.DrawContents(rect);
         }
 
         var fasterGameLoadingGoesAbove = FasterGameLoadingWindowLayout.GoesAboveMainWindow(
@@ -352,17 +346,29 @@ internal static class Verse_LongEventHandler_DrawOwnWindow_Patch
             fasterGameLoadingProgressWindowSize.x,
             fasterGameLoadingProgressWindowSize.y
         );
-        if (!useStandardWindow)
-        {
-            Widgets.DrawShadowAround(rect);
-            Widgets.DrawWindowBackground(rect);
-            FasterGameLoadingProgressWindow.DrawContents(rect);
-        }
-        else
-        {
-            FasterGameLoadingProgressWindow.DrawWindow(rect);
-        }
+        Widgets.DrawShadowAround(rect);
+        Widgets.DrawWindowBackground(rect);
+        FasterGameLoadingProgressWindow.DrawContents(rect);
     }
+}
+
+// Suppresses vanilla's own status box whenever Verse_LongEventHandler_DrawOwnWindow_Patch is about
+// to draw its own replacement content instead, so the two don't both end up on screen at once.
+[HarmonyPatch(typeof(LongEventHandler), "DrawLongEventWindow")]
+internal static class Verse_LongEventHandler_DrawLongEventWindow_Patch
+{
+    internal static bool Prefix() =>
+        !Verse_LongEventHandler_DrawOwnWindow_Patch.ShouldReplaceVanillaWindow(out _);
+}
+
+// Draws our window for LongEventsOnGUI's DrawLongEventWindow branch - see
+// Verse_LongEventHandler_DrawOwnWindow_Patch's comment for why this can't be spliced into
+// LongEventsOnGUI itself like the other branch. WindowStackOnGUI runs every frame regardless of
+// any long event; Draw() itself is a no-op whenever ShouldReplaceVanillaWindow is false.
+[HarmonyPatch(typeof(WindowStack), nameof(WindowStack.WindowStackOnGUI))]
+internal static class Verse_WindowStack_WindowStackOnGUI_Patch
+{
+    internal static void Prefix() => Verse_LongEventHandler_DrawOwnWindow_Patch.Draw();
 }
 
 [HarmonyPatch(typeof(LongEventHandler), nameof(LongEventHandler.LongEventsOnGUI))]
@@ -384,6 +390,14 @@ internal sealed class Verse_LongEventHandler_LongEventsOnGUI_Patch
     private static readonly MethodInfo _methodAdjustReservedBlockCenter = AccessTools.Method(
         typeof(Verse_LongEventHandler_LongEventsOnGUI_Patch),
         nameof(AdjustReservedBlockCenter)
+    );
+    private static readonly MethodInfo _methodDrawLongEventWindowContents = AccessTools.Method(
+        typeof(LongEventHandler),
+        "DrawLongEventWindowContents"
+    );
+    private static readonly MethodInfo _methodDrawOwnWindow = AccessTools.Method(
+        typeof(Verse_LongEventHandler_DrawOwnWindow_Patch),
+        nameof(Verse_LongEventHandler_DrawOwnWindow_Patch.Draw)
     );
 
     // Vanilla computes this (its local num3) as half of screenHeight minus the full
@@ -583,6 +597,28 @@ internal sealed class Verse_LongEventHandler_LongEventsOnGUI_Patch
         }
 
         _ = codeMatcher.Advance(1).Insert([new(OpCodes.Call, _methodAdjustStatusWindowRect)]);
+
+        // Splices our own window's draw call in directly after vanilla's own content call, landing
+        // after vanilla's full-screen background paint (drawn just before it) but before its
+        // internal TooltipHandler.DoTooltipGUI() call - see Verse_LongEventHandler_DrawOwnWindow_
+        // Patch's comment for why neither a Prefix nor a Postfix on the whole method can land in
+        // that same spot. Only covers the raw-content branch (DrawLongEventWindowContents); the
+        // other branch (DrawLongEventWindow) is handled by the WindowStack.WindowStackOnGUI Prefix
+        // below instead, for the same reason.
+        _ = codeMatcher.SearchForward(i =>
+            i.opcode == OpCodes.Call
+            && i.operand is MethodInfo m
+            && m == _methodDrawLongEventWindowContents
+        );
+        if (!codeMatcher.IsValid)
+        {
+            LoadingProgressMod.Error(
+                $"Could not patch LongEventHandler.LongEventsOnGUI, IL does not match expectations ([call DrawLongEventWindowContents])"
+            );
+            return originalInstructionList;
+        }
+
+        _ = codeMatcher.Advance(1).Insert([new(OpCodes.Call, _methodDrawOwnWindow)]);
 
         return codeMatcher.Instructions();
     }

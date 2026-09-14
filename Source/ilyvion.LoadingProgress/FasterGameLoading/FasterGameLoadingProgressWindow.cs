@@ -24,28 +24,6 @@ internal static class FasterGameLoadingProgressWindow
 
     internal static ModContentPack? LoadingMod { get; set; }
 
-    internal static void DrawWindow(Rect statusRect)
-    {
-        if (
-            !FasterGameLoadingUtils.HasFasterGameLoading
-            || !FasterGameLoadingUtils.EarlyModContentLoading
-            || FasterGameLoadingUtils.FasterGameLoadingEarlyModContentLoadingIsFinished
-        )
-        {
-            return;
-        }
-
-        Find.WindowStack.ImmediateWindow(
-            1217160,
-            statusRect,
-            WindowLayer.Super,
-            delegate
-            {
-                DrawContents(statusRect.AtZero());
-            }
-        );
-    }
-
     internal static void DrawContents(Rect rect)
     {
         if (

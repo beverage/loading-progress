@@ -30,18 +30,6 @@ internal sealed partial class LoadingProgressWindow
         _lastLoadingTime.HasValue
         && _currentModHash != LoadingProgressMod.Settings.LastLoadingModHash;
 
-    private static readonly int LoadingProgressWindowId = "LoadingProgress".GetHashCode(
-        StringComparison.Ordinal
-    );
-
-    internal static void DrawWindow(Rect statusRect) =>
-        Find.WindowStack.ImmediateWindow(
-            LoadingProgressWindowId,
-            statusRect,
-            WindowLayer.Super,
-            () => DrawContents(statusRect.AtZero())
-        );
-
     internal static Stopwatch? _loadingStopwatch;
     internal static TimeSpan? _lastLoadingTime;
     internal static int _currentModHash;

@@ -22,14 +22,6 @@ internal static class InGameLoadingWindow
                 + 10f
         );
 
-    internal static void DrawWindow(Rect statusRect) =>
-        Find.WindowStack.ImmediateWindow(
-            "InGameLoadingProgress".GetHashCode(StringComparison.Ordinal),
-            statusRect,
-            WindowLayer.Super,
-            () => DrawContents(statusRect.AtZero())
-        );
-
     internal static void DrawContents(Rect rect)
     {
         Text.Font = GameFont.Medium;

@@ -1,0 +1,32 @@
+[b]Loading Progress[/b] is a RimWorld mod that adds a detailed loading progress window to the game. It visually tracks each stage of RimWorld's startup process, showing which step is currently running. This makes waiting for RimWorld to start slightly more interesting. The mod is especially useful for those with large mod lists. No configuration required—just install and enjoy better insight into your game's loading process!
+
+[h2]New with version v0.9 -- Loading time impact tracking[/h2]
+Loosely based on the mod Startup impact, the mod now tracks and can show what mods are having what impact on your loading times. Click the loading time summary text in the bottom-right corner of your screen on the main menu to see the stats!
+
+Since the initial release of the feature caused issues for people, the feature is disabled by default. I believe the latest version, 0.9.3, has fixed the issue, but I'm leaving the feature disabled by default for the time being. You should feel safe to try enabling it though, but if you run into any issues after doing so, please come give me a bug report so I can address it!
+
+[h1]Mod incompatibility[/h1]
+[list]
+[*] RimThemes makes this mod useless, because it just covers the whole loading process with a splash screen.
+[/list]
+
+If you encounter any issues, try disabling the [b]Enable patching of initialization code[/b] setting of Loading Progress to remove the most likely source of incompatibility. If that still doesn't work (and frankly, even if it does), please leave me a bug report so I can address the problem.
+
+[h1]Translations[/h1]
+The mod is now fully translatable! Since we're loading very early on, we can't use the game's translation system because translations are literally not loaded yet, so I had to write my own. It's supposed to be fully compatible with the regular RimWorld translation organization system, so if you make a translation, and it doesn't work, please let me know so I can investigate.
+
+[h2]Available translations[/h2]
+[list]
+[*] Russian (built-in) originally by [url=https://steamcommunity.com/id/aks_kun/]Aks[/url], since maintained by machine translation. If someone's willing to move it into a separate mod and take ownership, I'd appreciate it.
+[*] [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3542771983]Chinese[/url] by [url=https://steamcommunity.com/profiles/76561198293334177]大番薯之怒[/url]
+[*] [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3775645721]Polish[/url] by [url=https://steamcommunity.com/id/drizztgaming4life]Drizzt[/url]
+[/list]
+Want your translation in this list? Release a translation mod (i.e. a mod with only a Languages folder, [i]not a copy of this entire mod + the translation[/i]) for this mod, and notify me of its existence, and I'll add it to the list. Please license your translation mod in such a way that someone else can take over if you are no longer interested in doing the work at a later date.
+
+[h1]Source code[/h1]
+Source code can be found on [url=https://github.com/ilyvion/loading-progress/]GitHub[/url]. Report any bugs or feature suggestions/requests on the [url=https://github.com/ilyvion/loading-progress/issues]issue tracker[/url].
+
+[h1]Like my work?[/h1]
+[url=https://ko-fi.com/ilyvion][img]https://alexanderschroeder.net/files/steam/kofi_brandasset/support_me_on_kofi_beige.png[/img][/url]
+
+Feel free to [url=https://discord.gg/J9Q78avHgM]join my Discord server[/url] if you want to talk to me (and other members) about my projects, or just to hang out, I guess. :)

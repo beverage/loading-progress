@@ -70,7 +70,10 @@
     <LoadingProgress.StartupImpact.Loaded>Загружено успешно</LoadingProgress.StartupImpact.Loaded>
     <LoadingProgress.StartupImpact.LoadFailedNoData>Ошибка загрузки: сохранённые данные не найдены</LoadingProgress.StartupImpact.LoadFailedNoData>
     <LoadingProgress.StartupImpact.LoadFailed>Ошибка загрузки: {0}</LoadingProgress.StartupImpact.LoadFailed>
-    <LoadingProgress.StartupImpact.Disabled>&lt;i&gt;Отслеживание влияния на время запуска отключено в настройках&lt;/i&gt;</LoadingProgress.StartupImpact.Disabled>
+    <LoadingProgress.StartupImpact.DisabledAtStartup>Отслеживание влияния на время запуска было отключено при старте игры, поэтому для этой сессии нет данных.</LoadingProgress.StartupImpact.DisabledAtStartup>
+    <LoadingProgress.StartupImpact.EnableTracking>Включить отслеживание влияния на время запуска</LoadingProgress.StartupImpact.EnableTracking>
+    <LoadingProgress.StartupImpact.EnableTrackingHint>Включите его ниже, чтобы отслеживать при следующем запуске игры.</LoadingProgress.StartupImpact.EnableTrackingHint>
+    <LoadingProgress.StartupImpact.WillTrackNextStartup>Теперь оно включено, и будет отслеживаться при следующем запуске игры.</LoadingProgress.StartupImpact.WillTrackNextStartup>
     <LoadingProgress.StartupImpact.HtmlReport.Title>Отчёт о влиянии на время запуска</LoadingProgress.StartupImpact.HtmlReport.Title>
     <LoadingProgress.StartupImpact.HtmlReport.Footer>Создано модом Loading Progress {0}.</LoadingProgress.StartupImpact.HtmlReport.Footer>
 </LanguageData>

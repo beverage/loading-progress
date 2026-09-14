@@ -13,14 +13,23 @@ internal sealed class StartupImpact
     public float TotalLoadingTime { get; private set; }
     public Profiler BaseGameProfiler { get; }
 
+    /// <summary>
+    /// Whether TrackStartupLoadingImpact was on when the mod was constructed, i.e. for the
+    /// whole duration of this startup. Unlike LoadingProgressMod.Settings.TrackStartupLoadingImpact,
+    /// this doesn't change if the user flips the setting later in the same session.
+    /// </summary>
+    public bool WasTrackingEnabledAtStartup { get; }
+
     public StartupImpact()
     {
         _activeThreadId = Environment.CurrentManagedThreadId;
 
+        WasTrackingEnabledAtStartup = LoadingProgressMod.Settings.TrackStartupLoadingImpact;
+
         BaseGameProfiler = new Profiler("base game");
         _loadingProfiler = new ProfilerStopwatch("loading");
 
-        if (LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        if (WasTrackingEnabledAtStartup)
         {
             _loadingProfiler.Start("loading");
         }
@@ -42,7 +51,7 @@ internal sealed class StartupImpact
             );
 
             if (
-                LoadingProgressMod.Settings.TrackStartupLoadingImpact
+                WasTrackingEnabledAtStartup
                 && LoadingProgressMod.Settings.AutoSaveStartupImpactReport
             )
             {

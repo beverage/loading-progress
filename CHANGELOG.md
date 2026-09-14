@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The loading window now also appears during in-game world generation, new-game map generation, loading a save, settling on a tile or setting up a camp from a caravan, and the planet's map mesh regeneration (e.g. right after generating a new world or opening the world map after loading a save), showing the current activity and elapsed time. Where possible, it shows the current phase (e.g. reading the file, loading maps, spawning things, spawning your colonists onto a new map) along with a progress bar tracking how far along that phase is, or, for map mesh regeneration, how many of the planet's layers have finished. For map generation that freezes the game with no opportunity to show live progress, such as arriving at a caravan site, being attacked while away from home, ambushes, caravan meetings and demands, peace talks, escaping by ship, transport pods arriving, gravship landings, and the new colony quest, the loading window instead briefly appears without live progress.
 - Added a feature to keep the in-game loading window responsive while the map or world renderer regenerates after generation or loading finishes, instead of it appearing to freeze, with a progress bar tracking how much of it is done. This applies to new games, loaded saves, settling or generating maps while playing, and world generation. There's an option to turn it off in case it causes misbehavior.
 
+### Fixed
+
+- Opening the startup time dialog when startup loading impact tracking wasn't enabled when the game started no longer shows a confusing screen full of zeroes with an easy-to-miss note in the corner. It now clearly explains that tracking was off for this session and offers a button to turn it on for the next startup.
+
 ## [0.14.0] - 2026-08-02
 
 ### Added

@@ -217,33 +217,32 @@ internal sealed class DialogStartupImpact : Window
     // Set window width to 800 and height to the lesser of 800 or 75% of the screen height
     public override Vector2 InitialSize => new(800f, Math.Min(800f, UI.screenHeight * 0.75f));
 
-    private string _statusText = "";
     private double? _statusTextSetTime;
     private const float StatusTextDisplayTimeSeconds = 5f;
     private string? _exportedPath;
     private string StatusText
     {
-        get => _statusText;
+        get;
         set
         {
-            _statusText = value;
+            field = value;
             if (!string.IsNullOrEmpty(value))
             {
                 _statusTextSetTime = Time.realtimeSinceStartup;
             }
         }
-    }
+    } = "";
+
+    private readonly bool _wasTrackingEnabledAtStartup = LoadingProgressMod
+        .instance
+        .StartupImpact
+        .WasTrackingEnabledAtStartup;
 
     public DialogStartupImpact()
     {
         _currentSessionData = StartupImpactSessionData.FromCurrentSession();
         _sessionData = _currentSessionData;
         Initialize();
-
-        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
-        {
-            _statusText = "LoadingProgress.StartupImpact.Disabled".Translate();
-        }
     }
 
     public override void PreClose()
@@ -341,6 +340,12 @@ internal sealed class DialogStartupImpact : Window
 
     public override void DoWindowContents(Rect area)
     {
+        if (!_wasTrackingEnabledAtStartup)
+        {
+            DoDisabledContents(area);
+            return;
+        }
+
         float y = 0;
 
         // Log scale checkbox (top right), with an optional detail slider to its left
@@ -677,6 +682,69 @@ internal sealed class DialogStartupImpact : Window
                     );
                 }
             }
+        }
+    }
+
+    private void DoDisabledContents(Rect area)
+    {
+        var isTrackingEnabledNow = LoadingProgressMod.Settings.TrackStartupLoadingImpact;
+
+        Text.Font = GameFont.Medium;
+        Text.Anchor = TextAnchor.MiddleCenter;
+        var textRect = new Rect(0, 0, area.width, area.height - ButtonHeight - (OuterSpacing * 2));
+        var secondLine = (
+            isTrackingEnabledNow
+                ? "LoadingProgress.StartupImpact.WillTrackNextStartup"
+                : "LoadingProgress.StartupImpact.EnableTrackingHint"
+        ).Translate();
+        Widgets.Label(
+            textRect,
+            $"{"LoadingProgress.StartupImpact.DisabledAtStartup".Translate()}\n\n{secondLine}"
+        );
+        Text.Anchor = TextAnchor.UpperLeft;
+        Text.Font = GameFont.Small;
+
+        var yBtn = area.height - ButtonHeight;
+        var closeLabel = "Close".Translate();
+
+        if (isTrackingEnabledNow)
+        {
+            var closeOnlyRect = new Rect(
+                (area.width - ButtonWidth) / 2f,
+                yBtn,
+                ButtonWidth,
+                ButtonHeight
+            );
+            if (Widgets.ButtonText(closeOnlyRect, closeLabel, true, false, true))
+            {
+                Close();
+            }
+            return;
+        }
+
+        var enableLabel = "LoadingProgress.StartupImpact.EnableTracking".Translate();
+        var enableButtonWidth = Text.CalcSize(enableLabel).x + (OuterSpacing * 2);
+        var enableButtonRect = new Rect(
+            (area.width - enableButtonWidth - OuterSpacing - ButtonWidth) / 2f,
+            yBtn,
+            enableButtonWidth,
+            ButtonHeight
+        );
+        if (Widgets.ButtonText(enableButtonRect, enableLabel))
+        {
+            LoadingProgressMod.Settings.TrackStartupLoadingImpact = true;
+            LoadingProgressMod.instance.WriteSettings();
+            Close();
+        }
+        var closeButtonRect = new Rect(
+            enableButtonRect.xMax + OuterSpacing,
+            yBtn,
+            ButtonWidth,
+            ButtonHeight
+        );
+        if (Widgets.ButtonText(closeButtonRect, closeLabel, true, false, true))
+        {
+            Close();
         }
     }
 

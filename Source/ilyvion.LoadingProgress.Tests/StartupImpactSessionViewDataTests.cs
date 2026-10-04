@@ -89,4 +89,27 @@ internal sealed class StartupImpactSessionViewDataTests
         Expect.AreNotEqual(entries[0].Label, entries[1].Label);
         Expect.IsTrue(entries[1].Label.Contains(entries[0].Label, StringComparison.Ordinal));
     }
+
+    // The bar as the window draws it, from this startup's own session: every entry a segment
+    // with a colour, largest first, on a span that holds the remaining total.
+    [Test]
+    public static void TheRemainingBarCarriesEveryEntryLargestFirstOnASpanHoldingTheTotal()
+    {
+        var viewData = new StartupImpactSessionViewData(
+            StartupImpactSessionData.FromCurrentSession()
+        );
+
+        Expect.IsTrue(viewData.CategoriesRemaining.Count == viewData.RemainingByStage.Count);
+        Expect.IsTrue(viewData.MetricsRemaining.Count == viewData.RemainingByStage.Count);
+        foreach (var category in viewData.CategoriesRemaining)
+        {
+            Expect.IsTrue(viewData.CategoryColorsRemaining.ContainsKey(category));
+        }
+        for (var i = 1; i < viewData.MetricsRemaining.Count; i++)
+        {
+            Expect.IsTrue(viewData.MetricsRemaining[i] <= viewData.MetricsRemaining[i - 1]);
+        }
+        Expect.GreaterThanOrEqualTo(viewData.RemainingBarSpan, viewData.RemainingLoadingTime);
+        Expect.GreaterThanOrEqualTo(viewData.RemainingBarSpan, viewData.MetricsRemaining.Sum());
+    }
 }

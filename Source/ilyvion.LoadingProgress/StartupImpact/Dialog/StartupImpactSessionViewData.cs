@@ -42,6 +42,9 @@ internal sealed class StartupImpactSessionViewData
     private readonly List<float> metricsMods = [];
     private readonly Dictionary<string, Color> categoryColorsMods = [];
     private readonly List<RemainingEntry> remainingByStage = [];
+    private readonly List<string> categoriesRemaining = [];
+    private readonly List<float> metricsRemaining = [];
+    private readonly Dictionary<string, Color> categoryColorsRemaining = [];
 
     internal IReadOnlyList<StartupImpactSessionModViewData> ModViewData => modViewData.AsReadOnly();
 
@@ -60,12 +63,29 @@ internal sealed class StartupImpactSessionViewData
     public IReadOnlyList<string> CategoriesMods => categoriesMods.AsReadOnly();
     public IReadOnlyList<float> MetricsMods => metricsMods.AsReadOnly();
     public IReadOnlyDictionary<string, Color> CategoryColorsMods => categoryColorsMods.AsReadOnly();
+    public IReadOnlyList<string> CategoriesRemaining => categoriesRemaining.AsReadOnly();
+    public IReadOnlyList<float> MetricsRemaining => metricsRemaining.AsReadOnly();
+    public IReadOnlyDictionary<string, Color> CategoryColorsRemaining =>
+        categoryColorsRemaining.AsReadOnly();
 
     /// <summary>
     /// The span the totals bar covers: the loading time, or the time to the main menu when the
     /// session recorded one, since what ran between the two is counted as well.
     /// </summary>
     public float TotalWindow => Math.Max(sessionData.LoadingTime, sessionData.TimeToMenu);
+
+    /// <summary>
+    /// The remaining part of the startup time: what is left of the window once the mods,
+    /// hidden or not, and the base game have had theirs. The totals bar's last segment.
+    /// </summary>
+    public float RemainingLoadingTime =>
+        metricsTotal.Count == CategoriesTotal.Length ? metricsTotal[^1] : 0f;
+
+    /// <summary>
+    /// What the remaining bar spans: the remaining total, or the sum of its entries when the
+    /// stages add up to more, since the two are measured separately and can differ a little.
+    /// </summary>
+    public float RemainingBarSpan => Math.Max(RemainingLoadingTime, metricsRemaining.Sum());
 
     /// <summary>
     /// How the remaining time splits by loading stage, largest first, with what came after
@@ -206,6 +226,9 @@ internal sealed class StartupImpactSessionViewData
     private void CalculateRemainingByStage()
     {
         remainingByStage.Clear();
+        categoriesRemaining.Clear();
+        metricsRemaining.Clear();
+        categoryColorsRemaining.Clear();
         RemainingTooltipDetails = null;
 
         remainingByStage.AddRange(
@@ -219,6 +242,13 @@ internal sealed class StartupImpactSessionViewData
         if (remainingByStage.Count == 0)
         {
             return;
+        }
+
+        foreach (var entry in remainingByStage)
+        {
+            categoriesRemaining.Add(entry.Label);
+            metricsRemaining.Add(entry.Ms);
+            categoryColorsRemaining[entry.Label] = StartupImpactProfilerUtil.HashColor(entry.Key);
         }
 
         var sb = new StringBuilder(

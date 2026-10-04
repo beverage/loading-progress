@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Deferred initialization tasks are now credited to the mod whose def they set up. The game queues one such task per def for its graphics and references, all from its own code, so every one of them was listed under 'not directly related to mods' no matter whose def it was; a framework's per-def work now goes to the def's mod as well. Contributed by [beverage](https://github.com/beverage).
+
 ### Fixed
 
 - Faster Game Loading went unrecognized when its Workshop copy carried the '_steam' package id suffix the game adds while a local copy with the same id is installed. Its early content loading was then neither shown in the loading window nor taken into account when loading content.

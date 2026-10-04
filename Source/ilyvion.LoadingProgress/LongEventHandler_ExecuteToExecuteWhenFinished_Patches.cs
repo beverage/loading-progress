@@ -307,11 +307,9 @@ internal static partial class LongEventHandler_ExecuteToExecuteWhenFinished_Patc
             DeepProfiler.Start(label);
             try
             {
-                var methodAssembly = toExecuteWhenFinished.Method.DeclaringType.Assembly;
-                var assemblyMod = Utilities.FindModByAssembly(methodAssembly);
-                var isBaseGame = methodAssembly.FullName.StartsWith(
-                    "Assembly-CSharp",
-                    StringComparison.Ordinal
+                var assemblyMod = StartupImpactProfilerUtil.OwnerOfDeferredAction(
+                    toExecuteWhenFinished,
+                    out var isBaseGame
                 );
                 if (isBaseGame)
                 {

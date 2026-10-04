@@ -1,4 +1,5 @@
 using System.Reflection.Emit;
+using ilyvion.LoadingProgress.StartupImpact;
 
 namespace ilyvion.LoadingProgress;
 
@@ -84,10 +85,28 @@ internal sealed class StaticConstructorOnStartupUtilityReplacement
         DeepProfiler.Start("Static constructor calls");
         try
         {
-            StaticConstructorOnStartupUtility.CallAll();
+            // Timing the hooks means patching other mods' methods, which only a player who
+            // asked for startup impact tracking has agreed to.
+            if (LoadingProgressMod.instance.StartupImpact.WasTrackingEnabledAtStartup)
+            {
+                CallAllWithHooksTimed();
+            }
+            else
+            {
+                StaticConstructorOnStartupUtility.CallAll();
+            }
+
             if (Prefs.DevMode)
             {
-                StaticConstructorOnStartupUtility.ReportProbablyMissingAttributes();
+                StartupImpactProfilerUtil.StartBaseGameProfiler(ReportMissingAttributesCategory);
+                try
+                {
+                    StaticConstructorOnStartupUtility.ReportProbablyMissingAttributes();
+                }
+                finally
+                {
+                    StartupImpactProfilerUtil.StopBaseGameProfiler(ReportMissingAttributesCategory);
+                }
             }
         }
         finally
@@ -110,7 +129,11 @@ internal sealed class StaticConstructorOnStartupUtilityReplacement
         }
         yield return null;
 
+        // The collect and the unload are the engine's; they get a heading of their own under
+        // the base game. The unload is asynchronous and blocks the next frame, so the category
+        // stays open across the yield that follows and takes that frame in.
         DeepProfiler.Start("Garbage Collection");
+        StartupImpactProfilerUtil.StartBaseGameProfiler(GarbageCollectionCategory);
         try
         {
             RimWorld.IO.AbstractFilesystem.ClearAllCache();
@@ -122,7 +145,61 @@ internal sealed class StaticConstructorOnStartupUtilityReplacement
             DeepProfiler.End();
         }
         yield return null;
+        StartupImpactProfilerUtil.StopBaseGameProfiler(GarbageCollectionCategory);
     }
+
+    internal const string GarbageCollectionCategory =
+        "LoadingProgress.StartupImpact.GarbageCollection";
+
+    internal const string ReportMissingAttributesCategory =
+        "LoadingProgress.StartupImpact.ReportProbablyMissingAttributes";
+
+    // The engine's own CallAll pass: the call itself, with every hook on it timed elsewhere.
+    internal const string CallAllPassCategory =
+        "LoadingProgress.StartupImpact.StaticConstructorOnStartupUtilityCallAllPass";
+
+    // The same, when some hooks could not be timed on their own: their owners follow the '|'.
+    internal const string CallAllPassWithUntimedHooksKey =
+        "LoadingProgress.StartupImpact.StaticConstructorOnStartupUtilityCallAllPassWithUntimedHooks";
+
+    private static readonly MethodInfo CallAllMethod = AccessTools.Method(
+        typeof(StaticConstructorOnStartupUtility),
+        nameof(StaticConstructorOnStartupUtility.CallAll)
+    );
+
+    /// <summary>
+    /// Runs the engine's CallAll with every other mod's hook on it timed under that mod.
+    /// </summary>
+    /// <remarks>
+    /// Every constructor has already run, so what this pass costs is the other mods' hooks on
+    /// it. Each hook is timed under its own mod for the duration of the call; whatever cannot
+    /// be is named on the call's own category instead.
+    /// </remarks>
+    private static void CallAllWithHooksTimed()
+    {
+        var hookTiming = CallAllHookTiming.Install(CallAllMethod);
+        var passCategory = CallAllPassCategoryFor(hookTiming.UntimedOwners);
+        CallAllHookTiming.BaseCategory = passCategory;
+        StartupImpactProfilerUtil.StartBaseGameProfiler(passCategory);
+        try
+        {
+            StaticConstructorOnStartupUtility.CallAll();
+        }
+        finally
+        {
+            StartupImpactProfilerUtil.StopBaseGameProfiler(passCategory);
+            hookTiming.Remove();
+        }
+    }
+
+    /// <summary>
+    /// The category for the engine's own CallAll pass: the call itself, naming whichever hooks
+    /// could not be timed under their own mods, so their time still has an address.
+    /// </summary>
+    internal static string CallAllPassCategoryFor(IReadOnlyList<string> untimedOwners) =>
+        untimedOwners.Count == 0
+            ? CallAllPassCategory
+            : $"{CallAllPassWithUntimedHooksKey}|{string.Join(", ", untimedOwners)}";
 }
 
 internal static partial class LongEventHandler_ExecuteToExecuteWhenFinished_Patches

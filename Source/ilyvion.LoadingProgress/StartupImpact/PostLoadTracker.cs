@@ -1,19 +1,21 @@
 namespace ilyvion.LoadingProgress.StartupImpact;
 
 /// <summary>
-/// Follows the long events that run after the tracking clock has stopped, up to the first
-/// frame the main menu sits idle, and times each under the mod whose code it runs.
+/// Follows the startup's tail: the long events that run once loading is over, up to the first
+/// frame the main menu sits idle. Keeps the loading window's activity line on the event that
+/// is running, ends the startup for the window when the menu is reached and, with tracking
+/// on, times each event under the mod whose code it runs.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The clock stops where the interface begins initializing, the window's Finished stage, and
-/// the loading window leaves with it. What runs after, the rest of the interface's
-/// initialization and the windows and setup other mods queue for after loading, is time the
-/// player waits through with no bar on screen, and until now nothing measured it. Each such
-/// event is timed from the frame it became the current one to the frame it stopped being it,
-/// and credited to the mod whose code it runs, under its own category, so it shows beside
-/// everything else that mod cost. The interface's own event is timed from the clock stop
-/// instead, since it finishes within the frame the clock stops in.
+/// Loading is over, and the tracking clock stops, where the interface begins initializing,
+/// the window's Finished stage. What runs after, the rest of the interface's initialization
+/// and the windows and setup other mods queue for after loading, is time the player waits
+/// through, and until now nothing measured it and the window had already left the screen.
+/// Each such event is timed from the frame it became the current one to the frame it stopped
+/// being it, and credited to the mod whose code it runs, under its own category, so it shows
+/// beside everything else that mod cost. The interface's own event is timed from the clock
+/// stop instead, since it finishes within the frame the clock stops in.
 /// </para>
 /// <para>
 /// Time the game spends paused is left out. The engine keeps running in the background only
@@ -57,15 +59,13 @@ internal static class PostLoadTracker
             return;
         }
 
+        // Timing needs tracking; the window's tail runs with or without it.
         var startupImpact = LoadingProgressMod.instance?.StartupImpact;
-        if (startupImpact == null || !startupImpact.LoadingTimeMeasured)
+        var timing =
+            startupImpact is { WasTrackingEnabledAtStartup: true, LoadingTimeMeasured: true };
+        var finished = LoadingProgressWindow.CurrentStage == LoadingStage.Finished;
+        if (!timing && !finished)
         {
-            return;
-        }
-
-        if (!startupImpact.WasTrackingEnabledAtStartup)
-        {
-            _done = true;
             return;
         }
 
@@ -80,7 +80,7 @@ internal static class PostLoadTracker
         _pausedMs += paused;
 
         var current = LongEventHandler.currentEvent;
-        if (!ReferenceEquals(current, _current) || paused > 0f)
+        if (timing && (!ReferenceEquals(current, _current) || paused > 0f))
         {
             // An event that was current through a pause has the pause taken back off its
             // time, and goes on being timed from here.
@@ -90,6 +90,10 @@ internal static class PostLoadTracker
                 StartCurrent(current);
             }
         }
+        if (finished && current != null)
+        {
+            LoadingProgressWindow.ShowPostLoadEvent(current);
+        }
 
         if (Current.ProgramState != ProgramState.Entry)
         {
@@ -98,7 +102,12 @@ internal static class PostLoadTracker
             return;
         }
 
-        if (current == null && !LongEventHandler.AnyEventNowOrWaiting && Find.UIRoot != null)
+        if (
+            finished
+            && current == null
+            && !LongEventHandler.AnyEventNowOrWaiting
+            && Find.UIRoot != null
+        )
         {
             // The queue going empty is not the player being able to click. A mod that builds
             // its state on the menu's first frame stalls the main thread between that frame
@@ -161,7 +170,8 @@ internal static class PostLoadTracker
     }
 
     /// <summary>
-    /// Ends the timing: when the menu was reached, the tracker takes its time to it.
+    /// Ends the tail: the window records its loading time and leaves, and the tracker, when
+    /// the menu was reached, takes its time to it.
     /// </summary>
     private static void Finish(StartupImpact? startupImpact, bool menuReached)
     {
@@ -171,6 +181,7 @@ internal static class PostLoadTracker
         {
             Application.focusChanged -= OnFocusChanged;
         }
+        LoadingProgressWindow.CompleteStartup(_pausedMs);
         if (menuReached)
         {
             startupImpact?.MarkMenuReached(_pausedMs);

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Faster Game Loading went unrecognized when its Workshop copy carried the '_steam' package id suffix the game adds while a local copy with the same id is installed. Its early content loading was then neither shown in the loading window nor taken into account when loading content.
+- Each pair of bars for time on the loading thread and time on other threads, the base game's and every mod's, is now drawn on one scale, so the longer of the two spans the width and the other is drawn in proportion. The loading-thread bar used to fill the width on its own scale, so an off-thread total above it read as equal. The HTML export does the same.
 
 ## [0.17.0] - 2026-10-03
 

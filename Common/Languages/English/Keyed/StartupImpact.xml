@@ -45,7 +45,13 @@
     <LoadingProgress.StartupImpact.Total.Mods>Mods</LoadingProgress.StartupImpact.Total.Mods>
     <LoadingProgress.StartupImpact.Total.ModsHidden>Hidden mods</LoadingProgress.StartupImpact.Total.ModsHidden>
     <LoadingProgress.StartupImpact.Total.BaseGame>Not directly related to mods</LoadingProgress.StartupImpact.Total.BaseGame>
-    <LoadingProgress.StartupImpact.Total.Others>Untracked</LoadingProgress.StartupImpact.Total.Others>
+    <LoadingProgress.StartupImpact.Total.Others>Remaining</LoadingProgress.StartupImpact.Total.Others>
+    <LoadingProgress.StartupImpact.Remaining.ByStage>Remaining time by loading stage, largest first:</LoadingProgress.StartupImpact.Remaining.ByStage>
+    <LoadingProgress.StartupImpact.Remaining.AfterLoading>After loading, until the main menu was usable</LoadingProgress.StartupImpact.Remaining.AfterLoading>
+    <LoadingProgress.StartupImpact.Remaining.SecondPass>{0} (second pass)</LoadingProgress.StartupImpact.Remaining.SecondPass>
+    <LoadingProgress.StartupImpact.PostLoadLongEvent>After loading: {0}</LoadingProgress.StartupImpact.PostLoadLongEvent>
+    <LoadingProgress.StartupImpact.PostLoadLongEvent.Grouped>Long events after loading</LoadingProgress.StartupImpact.PostLoadLongEvent.Grouped>
+    <LoadingProgress.StartupImpact.SavingReport>Saving the startup impact report</LoadingProgress.StartupImpact.SavingReport>
     <LoadingProgress.StartupImpact.Seconds>{0} s</LoadingProgress.StartupImpact.Seconds>
     <LoadingProgress.StartupImpact.Milliseconds>{0} ms</LoadingProgress.StartupImpact.Milliseconds>
     <LoadingProgress.StartupImpact.StartupTime>Startup time: {0}</LoadingProgress.StartupImpact.StartupTime>
@@ -103,6 +109,7 @@
     <LoadingProgress.StartupImpact.History.Note.Unfinished>Never finished</LoadingProgress.StartupImpact.History.Note.Unfinished>
     <LoadingProgress.StartupImpact.History.Note.UnfinishedAt>Stopped at {0}</LoadingProgress.StartupImpact.History.Note.UnfinishedAt>
     <LoadingProgress.StartupImpact.History.Note.DifferentList>Different mod list, not comparable</LoadingProgress.StartupImpact.History.Note.DifferentList>
+    <LoadingProgress.StartupImpact.History.Note.ToEndOfLoading>Timed to the end of loading, not to the main menu</LoadingProgress.StartupImpact.History.Note.ToEndOfLoading>
     <LoadingProgress.StartupImpact.History.Status.Pinned>Pinned.</LoadingProgress.StartupImpact.History.Status.Pinned>
     <LoadingProgress.StartupImpact.History.Status.Unpinned>Unpinned.</LoadingProgress.StartupImpact.History.Status.Unpinned>
     <LoadingProgress.StartupImpact.History.Status.BaselineSet>Baseline set.</LoadingProgress.StartupImpact.History.Status.BaselineSet>

@@ -1,0 +1,140 @@
+using DevTools.Testing;
+using ilyvion.LoadingProgress.StartupImpact;
+
+namespace ilyvion.LoadingProgress.Tests;
+
+[TestFixture(TestType.MainMenu)]
+internal sealed class PostLoadTrackerTests
+{
+    [Test]
+    public static void TheFirstIdleFrameNeverSettlesTheMenu() =>
+        Expect.IsFalse(PostLoadTracker.IsMenuSettled(-1f, 100000f, 1));
+
+    [Test]
+    public static void TwoCloseIdleFramesSettleTheMenu() =>
+        Expect.IsTrue(PostLoadTracker.IsMenuSettled(100000f, 100016f, 2));
+
+    // A mod building its state on the menu's first frame stalls the main thread for seconds
+    // with nothing queued; the frame after that stall must not count, or the stall is left
+    // out of the time to the menu.
+    [Test]
+    public static void AnIdleFrameAfterAStallDoesNotSettleTheMenu() =>
+        Expect.IsFalse(PostLoadTracker.IsMenuSettled(100000f, 107700f, 2));
+
+    [Test]
+    public static void TheFrameAfterTheStalledOneSettlesTheMenu() =>
+        Expect.IsTrue(PostLoadTracker.IsMenuSettled(107700f, 107716f, 3));
+
+    [Test]
+    public static void FramesAQuarterOfASecondApartAreNotClose()
+    {
+        Expect.IsTrue(PostLoadTracker.IsMenuSettled(1000f, 1249.9f, 2));
+        Expect.IsFalse(PostLoadTracker.IsMenuSettled(1000f, 1250f, 2));
+    }
+
+    // A menu that never draws two frames close together, below four frames a second, would
+    // otherwise keep the startup open until the player left the menu.
+    [Test]
+    public static void ASlowMenuSettlesAfterFiveIdleFrames()
+    {
+        Expect.IsFalse(PostLoadTracker.IsMenuSettled(1000f, 1400f, 4));
+        Expect.IsTrue(PostLoadTracker.IsMenuSettled(1000f, 1400f, 5));
+    }
+
+    // A player who switched to another window while the game loaded: the game stopped between
+    // two frames until they came back, and that wait is theirs, not the startup's.
+    [Test]
+    public static void AWaitInTheBackgroundIsAPause() =>
+        Expect.AreApproximatelyEqual(
+            600000f,
+            PostLoadTracker.PauseIn(1000f, 601000f, unfocusedSinceFrameEnd: true, false)
+        );
+
+    [Test]
+    public static void AWaitWithTheGameInFrontIsNoPause() =>
+        Expect.AreApproximatelyEqual(
+            0f,
+            PostLoadTracker.PauseIn(1000f, 601000f, unfocusedSinceFrameEnd: false, false)
+        );
+
+    // With 'Run in background' on the game never stops, so a long wait is something else.
+    [Test]
+    public static void AGameThatRunsInTheBackgroundIsNeverPaused() =>
+        Expect.AreApproximatelyEqual(
+            0f,
+            PostLoadTracker.PauseIn(1000f, 601000f, unfocusedSinceFrameEnd: true, true)
+        );
+
+    [Test]
+    public static void AnOrdinaryFrameIsNoPause() =>
+        Expect.AreApproximatelyEqual(
+            0f,
+            PostLoadTracker.PauseIn(1000f, 1016f, unfocusedSinceFrameEnd: true, false)
+        );
+
+    [Test]
+    public static void NothingIsPausedBeforeAFrameHasEnded() =>
+        Expect.AreApproximatelyEqual(
+            0f,
+            PostLoadTracker.PauseIn(-1f, 601000f, unfocusedSinceFrameEnd: true, false)
+        );
+
+    [Test]
+    public static void AnEventIsNamedByItsTextWhenTheKeyTranslates() =>
+        Expect.AreEqual(
+            "LoadingProgress.Title".Translate().ToString(),
+            PostLoadTracker.Describe("LoadingProgress.Title", null, null)
+        );
+
+    [Test]
+    public static void AKeyThatDoesNotTranslateIsShownAsItIs() =>
+        Expect.AreEqual(
+            "NoSuchKey.ForThisTest",
+            PostLoadTracker.Describe("NoSuchKey.ForThisTest", null, null)
+        );
+
+    // An event with no text used to be named after the compiler's closure class and method,
+    // which tell a player nothing.
+    [Test]
+    public static void ALambdaIsNamedAfterTheMethodItWasWrittenIn()
+    {
+        Action action = static () => { };
+
+        Expect.AreEqual(
+            $"{typeof(PostLoadTrackerTests).FullName}.{nameof(ALambdaIsNamedAfterTheMethodItWasWrittenIn)}",
+            PostLoadTracker.Describe(null, action, null)
+        );
+    }
+
+    [Test]
+    public static void AnIteratorIsNamedAfterItsMethod() =>
+        Expect.AreEqual(
+            $"{typeof(PostLoadTrackerTests).FullName}.{nameof(Steps)}",
+            PostLoadTracker.Describe(null, null, Steps())
+        );
+
+    [Test]
+    public static void AnEventIsOwnedByTheModWhoseCodeItRuns()
+    {
+        Action action = static () => { };
+
+        Expect.IsNotNull(PostLoadTracker.OwnerOf(action, null));
+        Expect.ReferencesAreEqual(
+            Utilities.FindModByAssembly(typeof(PostLoadTrackerTests).Assembly),
+            PostLoadTracker.OwnerOf(action, null)
+        );
+    }
+
+    [Test]
+    public static void TheEnginesOwnEventHasNoModOwner()
+    {
+        Action action = LongEventHandler.ClearQueuedEvents;
+
+        Expect.IsNull(PostLoadTracker.OwnerOf(action, null));
+    }
+
+    private static IEnumerator Steps()
+    {
+        yield break;
+    }
+}

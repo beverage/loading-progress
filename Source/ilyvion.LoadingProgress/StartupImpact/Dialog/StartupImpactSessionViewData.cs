@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace ilyvion.LoadingProgress.StartupImpact.Dialog;
 
 internal sealed class StartupImpactSessionViewData
@@ -9,6 +11,22 @@ internal sealed class StartupImpactSessionViewData
         "LoadingProgress.StartupImpact.Total.BaseGame",
         "LoadingProgress.StartupImpact.Total.Others",
     ];
+
+    /// <summary>
+    /// One part of the remaining time: the loading stage it fell in (or the time after loading
+    /// finished, keyed <see cref="AfterLoadingKey"/>), its text as shown, and how much.
+    /// </summary>
+    internal sealed record RemainingEntry(string Key, string Label, float Ms);
+
+    internal const string AfterLoadingKey = "LoadingProgress.StartupImpact.Remaining.AfterLoading";
+
+    // The second delayed-initialization pass borrows the first one's text, and the remaining
+    // time lists both, so it is told apart there.
+    private const string SecondPassKey = "LoadingProgress.StartupImpact.Remaining.SecondPass";
+
+    private const string PostLoadLongEventPrefix =
+        "LoadingProgress.StartupImpact.PostLoadLongEvent";
+    private const int RemainingDetailLines = 10;
 
     private readonly StartupImpactSessionData sessionData;
     private readonly List<StartupImpactSessionModViewData> modViewData;
@@ -23,6 +41,7 @@ internal sealed class StartupImpactSessionViewData
     private readonly List<string> categoriesMods = [];
     private readonly List<float> metricsMods = [];
     private readonly Dictionary<string, Color> categoryColorsMods = [];
+    private readonly List<RemainingEntry> remainingByStage = [];
 
     internal IReadOnlyList<StartupImpactSessionModViewData> ModViewData => modViewData.AsReadOnly();
 
@@ -42,6 +61,25 @@ internal sealed class StartupImpactSessionViewData
     public IReadOnlyList<float> MetricsMods => metricsMods.AsReadOnly();
     public IReadOnlyDictionary<string, Color> CategoryColorsMods => categoryColorsMods.AsReadOnly();
 
+    /// <summary>
+    /// The span the totals bar covers: the loading time, or the time to the main menu when the
+    /// session recorded one, since what ran between the two is counted as well.
+    /// </summary>
+    public float TotalWindow => Math.Max(sessionData.LoadingTime, sessionData.TimeToMenu);
+
+    /// <summary>
+    /// How the remaining time splits by loading stage, largest first, with what came after
+    /// loading finished as an entry of its own. Empty for sessions saved before stages were
+    /// kept.
+    /// </summary>
+    public IReadOnlyList<RemainingEntry> RemainingByStage => remainingByStage.AsReadOnly();
+
+    /// <summary>
+    /// The remaining split as the tooltip of the totals bar's remaining segment, or null when
+    /// there is nothing to say.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? RemainingTooltipDetails { get; private set; }
+
     public StartupImpactSessionViewData(StartupImpactSessionData sessionData)
     {
         this.sessionData = sessionData;
@@ -49,6 +87,7 @@ internal sealed class StartupImpactSessionViewData
 
         CalculateBaseGameStats();
         CalculateModStats();
+        CalculateRemainingByStage();
 
         foreach (var modView in modViewData)
         {
@@ -98,7 +137,7 @@ internal sealed class StartupImpactSessionViewData
         {
             sessionData.OverrideLoadingTime(totalLoadingTime);
         }
-        else if (totalLoadingTime > sessionData.LoadingTime)
+        else if (totalLoadingTime > TotalWindow)
         {
             sessionData.OverrideLoadingTime(totalLoadingTime);
         }
@@ -108,7 +147,7 @@ internal sealed class StartupImpactSessionViewData
             ModsLoadingTime,
             hiddenModsLoadingTime,
             BasegameLoadingTime,
-            Math.Max(0, sessionData.LoadingTime - totalLoadingTime),
+            Math.Max(0, TotalWindow - totalLoadingTime),
         ]);
 
         categoriesMods.Clear();
@@ -162,5 +201,107 @@ internal sealed class StartupImpactSessionViewData
         }
 
         OffThreadBasegameLoadingTime = sessionData.OffThreadTotalImpact;
+    }
+
+    private void CalculateRemainingByStage()
+    {
+        remainingByStage.Clear();
+        RemainingTooltipDetails = null;
+
+        remainingByStage.AddRange(
+            RemainingEntries(
+                sessionData.StageTimings,
+                sessionData.LoadingTime,
+                sessionData.TimeToMenu,
+                PostLoadAttributedTime()
+            )
+        );
+        if (remainingByStage.Count == 0)
+        {
+            return;
+        }
+
+        var sb = new StringBuilder(
+            "LoadingProgress.StartupImpact.Remaining.ByStage".Translate().ToString()
+        );
+        foreach (var entry in remainingByStage.Take(RemainingDetailLines))
+        {
+            _ = sb.Append('\n')
+                .Append(entry.Label)
+                .Append(": ")
+                .Append(ProfilerBar.TimeText(entry.Ms));
+        }
+        RemainingTooltipDetails = new Dictionary<string, string>
+        {
+            ["LoadingProgress.StartupImpact.Total.Others"] = sb.ToString(),
+        };
+    }
+
+    /// <summary>
+    /// The remaining entries a session's stages and its time to the menu give, largest first:
+    /// each stage's wall time less what categories accounted for in it, and what came after
+    /// loading finished less the long events timed there. Anything under a millisecond is
+    /// left out.
+    /// </summary>
+    internal static IReadOnlyList<RemainingEntry> RemainingEntries(
+        IEnumerable<StartupImpactStageData> stages,
+        float loadingTime,
+        float timeToMenu,
+        float postLoadAttributedMs
+    )
+    {
+        List<RemainingEntry> entries = [];
+        foreach (var stage in stages)
+        {
+            if (stage.RemainingMs >= 1f)
+            {
+                var label = StartupImpactSessionIndexEntry.TranslateStage(stage.Stage);
+                if (stage.Stage == nameof(LoadingStage.ExecuteToExecuteWhenFinished2))
+                {
+                    label = SecondPassKey.Translate(label);
+                }
+                entries.Add(new RemainingEntry(stage.Stage, label, stage.RemainingMs));
+            }
+        }
+
+        if (timeToMenu > loadingTime)
+        {
+            var afterLoading = timeToMenu - loadingTime - postLoadAttributedMs;
+            if (afterLoading >= 1f)
+            {
+                entries.Add(
+                    new RemainingEntry(AfterLoadingKey, AfterLoadingKey.Translate(), afterLoading)
+                );
+            }
+        }
+        entries.Sort((a, b) => b.Ms.CompareTo(a.Ms));
+        return entries;
+    }
+
+    /// <summary>
+    /// Time between the end of loading and the main menu that some category did account for:
+    /// the long events timed after loading, whoever ran them.
+    /// </summary>
+    private float PostLoadAttributedTime()
+    {
+        var total = 0f;
+        foreach (var entry in sessionData.Metrics)
+        {
+            if (entry.Key.StartsWith(PostLoadLongEventPrefix, StringComparison.Ordinal))
+            {
+                total += entry.Value;
+            }
+        }
+        foreach (var mod in sessionData.Mods)
+        {
+            foreach (var entry in mod.Metrics)
+            {
+                if (entry.Key.StartsWith(PostLoadLongEventPrefix, StringComparison.Ordinal))
+                {
+                    total += entry.Value;
+                }
+            }
+        }
+        return total;
     }
 }

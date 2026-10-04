@@ -1,9 +1,12 @@
-﻿namespace ilyvion.LoadingProgress.StartupImpact;
+﻿using System.Diagnostics;
+
+namespace ilyvion.LoadingProgress.StartupImpact;
 
 internal sealed class StartupImpact
 {
     private int _activeThreadId;
     private readonly ProfilerStopwatch _loadingProfiler;
+    private readonly Stopwatch _clock = new();
 
     public ModInfoList Modlist { get; } = new();
 
@@ -12,6 +15,30 @@ internal sealed class StartupImpact
     /// </summary>
     public float TotalLoadingTime { get; private set; }
     public Profiler BaseGameProfiler { get; }
+
+    /// <summary>
+    /// Milliseconds since tracking began, on the clock the stage ledger and the time to the
+    /// main menu are read from.
+    /// </summary>
+    internal float ElapsedMs => (float)_clock.Elapsed.TotalMilliseconds;
+
+    /// <summary>
+    /// Per loading stage, how long it ran against how much of it a category accounted for.
+    /// </summary>
+    public StageLedger StageLedger { get; } = new(LoadingStage.Initializing.ToString());
+
+    /// <summary>
+    /// Whether FinishLoading has run, i.e. the loading time has been taken.
+    /// </summary>
+    public bool LoadingTimeMeasured { get; private set; }
+
+    /// <summary>
+    /// Milliseconds from the start of tracking to the first frame the main menu sat idle, or
+    /// 0 until that frame comes. Later than <see cref="TotalLoadingTime"/> by however long the
+    /// interface's initialization and other mods' post-load events took, less any time the
+    /// game sat paused in the background in between.
+    /// </summary>
+    public float TimeToMenu { get; private set; }
 
     /// <summary>
     /// Whether TrackStartupLoadingImpact was on when the mod was constructed, i.e. for the
@@ -52,6 +79,9 @@ internal sealed class StartupImpact
         BaseGameProfiler = new Profiler("base game");
         _loadingProfiler = new ProfilerStopwatch("loading");
 
+        // The two clocks start together, so a time read off one can be set against the other:
+        // the time to the menu against the loading time, the stages against both.
+        _clock.Start();
         if (WasTrackingEnabledAtStartup)
         {
             _loadingProfiler.Start("loading");
@@ -69,15 +99,25 @@ internal sealed class StartupImpact
         }
     }
 
-    private bool _loadingTimeMeasured;
+    /// <summary>
+    /// Notes a stage change in the ledger.
+    /// </summary>
+    internal void NotifyStage(LoadingStage stage)
+    {
+        if (WasTrackingEnabledAtStartup)
+        {
+            StageLedger.Begin(stage.ToString(), ElapsedMs);
+        }
+    }
 
     public void FinishLoading()
     {
-        if (!_loadingTimeMeasured)
+        if (!LoadingTimeMeasured)
         {
-            _loadingTimeMeasured = true;
+            LoadingTimeMeasured = true;
             _ = _loadingProfiler.Stop("loading");
             TotalLoadingTime = _loadingProfiler.Total;
+            StageLedger.Close(ElapsedMs);
             _sessionCapturedAtUtc = DateTime.UtcNow;
 
             // This boot finished, so the marker no longer describes anything.
@@ -89,26 +129,39 @@ internal sealed class StartupImpact
             );
 
             // FinishLoading runs from inside the InitializingInterface long event; defer both of
-            // these until it has finished.
+            // these until it has finished. They run while that event is still being timed, so
+            // they are timed as Loading Progress's own work instead.
             if (PreviousUnfinishedBoot is not null)
             {
                 LongEventHandler.ExecuteWhenFinished(static () =>
-                {
-                    try
-                    {
-                        if (
-                            LoadingProgressMod.instance.StartupImpact.PreviousUnfinishedBoot is
-                            { } unfinished
-                        )
+                    PostLoadTracker.RunAsOwnWork(
+                        SavingReportDescription,
+                        static () =>
                         {
-                            Dialog.StartupImpactSessionStorage.RecordUnfinishedBoot(unfinished);
+                            try
+                            {
+                                if (
+                                    LoadingProgressMod
+                                        .instance
+                                        .StartupImpact
+                                        .PreviousUnfinishedBoot is
+                                    { } unfinished
+                                )
+                                {
+                                    Dialog.StartupImpactSessionStorage.RecordUnfinishedBoot(
+                                        unfinished
+                                    );
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                LoadingProgressMod.Error(
+                                    "Failed to record an unfinished boot: " + e
+                                );
+                            }
                         }
-                    }
-                    catch (Exception e)
-                    {
-                        LoadingProgressMod.Error("Failed to record an unfinished boot: " + e);
-                    }
-                });
+                    )
+                );
             }
 
             if (
@@ -117,19 +170,65 @@ internal sealed class StartupImpact
             )
             {
                 LongEventHandler.ExecuteWhenFinished(static () =>
-                {
-                    try
-                    {
-                        Dialog.StartupImpactSessionStorage.SaveAndRecord(
-                            Dialog.StartupImpactSessionData.FromCurrentSession()
-                        );
-                    }
-                    catch (Exception e)
-                    {
-                        LoadingProgressMod.Error("Failed to auto-save startup impact report: " + e);
-                    }
-                });
+                    PostLoadTracker.RunAsOwnWork(
+                        SavingReportDescription,
+                        static () =>
+                        {
+                            try
+                            {
+                                Dialog.StartupImpactSessionStorage.SaveAndRecord(
+                                    Dialog.StartupImpactSessionData.FromCurrentSession()
+                                );
+                            }
+                            catch (Exception e)
+                            {
+                                LoadingProgressMod.Error(
+                                    "Failed to auto-save startup impact report: " + e
+                                );
+                            }
+                        }
+                    )
+                );
             }
+        }
+    }
+
+    private static string SavingReportDescription =>
+        "LoadingProgress.StartupImpact.SavingReport".Translate().ToString();
+
+    /// <summary>
+    /// Takes the time to the main menu, less <paramref name="pausedMs"/> the game sat paused
+    /// in the background on the way, then rewrites the session with it and with the long
+    /// events timed since loading finished. Runs on the main thread at an idle frame, where
+    /// Scribe is safe to use.
+    /// </summary>
+    internal void MarkMenuReached(float pausedMs)
+    {
+        if (TimeToMenu > 0f || !LoadingTimeMeasured)
+        {
+            return;
+        }
+
+        TimeToMenu = Math.Max(TotalLoadingTime, ElapsedMs - pausedMs);
+
+        if (
+            !WasTrackingEnabledAtStartup || !LoadingProgressMod.Settings.AutoSaveStartupImpactReport
+        )
+        {
+            return;
+        }
+
+        try
+        {
+            Dialog.StartupImpactSessionStorage.SaveAndRecord(
+                Dialog.StartupImpactSessionData.FromCurrentSession()
+            );
+        }
+        catch (Exception e)
+        {
+            LoadingProgressMod.Error(
+                "Failed to update the startup impact report with the time to the main menu: " + e
+            );
         }
     }
 

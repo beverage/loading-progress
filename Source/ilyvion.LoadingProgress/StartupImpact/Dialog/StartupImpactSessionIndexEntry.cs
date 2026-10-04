@@ -23,6 +23,7 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
     private string lastStage = "";
     private bool pinned;
     private bool baseline;
+    private bool measuredToMenu;
 
     public string Id => id;
 
@@ -30,8 +31,9 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
         savedAtUtcTicks == 0 ? DateTime.MinValue : new DateTime(savedAtUtcTicks, DateTimeKind.Utc);
 
     /// <summary>
-    /// Total load time in milliseconds, matching StartupImpactSessionData and
-    /// the ProfilerStopwatch it comes from, or 0 for a boot that never
+    /// The time the session is listed by, in milliseconds: to the first usable
+    /// main-menu frame when the session recorded one, else to the point the
+    /// clock stopped (see <see cref="ListedTime"/>); 0 for a boot that never
     /// finished. Note this is not the unit Settings.LoadingTimes uses, which is
     /// seconds.
     /// </summary>
@@ -40,6 +42,13 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
     public int ModsLoaded => modsLoaded;
 
     public int ModListHash => modListHash;
+
+    /// <summary>
+    /// Whether <see cref="LoadingTime"/> runs to the main menu. False for a session saved
+    /// before that was measured, and for a startup that went straight into a game; theirs
+    /// runs to the end of loading only, so it reads shorter than a newer session's would.
+    /// </summary>
+    public bool MeasuredToMenu => measuredToMenu;
 
     /// <summary>
     /// Whether the boot reached the end of loading. False means the run was
@@ -180,12 +189,37 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
                     data.SavedAtUtc == DateTime.MinValue
                         ? DateTime.UtcNow.Ticks
                         : data.SavedAtUtc.Ticks,
-                loadingTime = data.LoadingTime,
+                loadingTime = ListedTime(data),
                 modsLoaded = data.ModsLoaded ?? data.Mods.Count,
                 modListHash = data.ModListHash,
                 completed = true,
                 lastStage = "",
+                measuredToMenu = data.TimeToMenu > 0f,
             };
+
+    /// <summary>
+    /// Takes the figures of a session saved again under this entry, as happens once the
+    /// main menu comes up and the session gains its time to the menu.
+    /// </summary>
+    internal void UpdateFrom(StartupImpactSessionData data)
+    {
+        if (data is null)
+        {
+            throw new ArgumentNullException(nameof(data));
+        }
+
+        loadingTime = ListedTime(data);
+        modsLoaded = data.ModsLoaded ?? data.Mods.Count;
+        measuredToMenu = data.TimeToMenu > 0f;
+    }
+
+    /// <summary>
+    /// The time a session is listed by: to the first usable main-menu frame when the session
+    /// recorded one, else to the point the clock stopped. The same figure the startup impact
+    /// window puts in its title.
+    /// </summary>
+    internal static float ListedTime(StartupImpactSessionData data) =>
+        Math.Max(data.LoadingTime, data.TimeToMenu);
 
     internal static StartupImpactSessionIndexEntry ForUnfinishedBoot(
         string id,
@@ -216,6 +250,7 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
         Scribe_Values.Look(ref lastStage, "lastStage", "");
         Scribe_Values.Look(ref pinned, "pinned");
         Scribe_Values.Look(ref baseline, "baseline");
+        Scribe_Values.Look(ref measuredToMenu, "measuredToMenu");
 
         if (Scribe.mode == LoadSaveMode.LoadingVars)
         {

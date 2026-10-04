@@ -138,6 +138,20 @@ internal static partial class LongEventHandler_ExecuteToExecuteWhenFinished_Patc
             (reloadContentIntMethod, reloadContentIntmodContentPackField) = methodFields.First();
         }
 
+        // This resumed pass runs after the atlas baking and the garbage collection, so the
+        // window's stage rule for it no longer fires. The stage ledger still begins the stage
+        // here, or what the pass leaves untimed would be filed under the garbage collection.
+        if (
+            StaticConstructorOnStartupUtilityReplacement._callAllCalled
+            && LoadingProgressWindow.CurrentStage > LoadingStage.ExecuteToExecuteWhenFinished2
+            && LoadingProgressWindow.CurrentStage < LoadingStage.Finished
+        )
+        {
+            LoadingProgressMod.instance.StartupImpact.NotifyStage(
+                LoadingStage.ExecuteToExecuteWhenFinished2
+            );
+        }
+
         LongEventHandler.executingToExecuteWhenFinished = true;
         if (LongEventHandler.toExecuteWhenFinished.Count > 0)
         {

@@ -13,6 +13,11 @@ internal sealed class ProfilerBar
     /// </summary>
     public float Tau { get; set; } = 1000f;
 
+    /// <summary>
+    /// Extra lines for a segment's tooltip, by category, shown under the usual label and time.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? TooltipDetails { get; set; }
+
     public static string TimeText(float ms) =>
         TimeText(ms, LoadingProgressMod.Settings.ShowStartupImpactTimesInSecondsOnly);
 
@@ -120,6 +125,14 @@ internal sealed class ProfilerBar
                 : category;
         }
 
+        string Tooltip(string category, float impact)
+        {
+            var text = $"{TooltipLabel(category)}: {TimeText(impact)}";
+            return TooltipDetails != null && TooltipDetails.TryGetValue(category, out var detail)
+                ? text + "\n" + detail
+                : text;
+        }
+
         void DrawLinearScale(
             IReadOnlyList<float> metrics,
             IReadOnlyList<string> categories,
@@ -146,10 +159,7 @@ internal sealed class ProfilerBar
                 var color = categoryColors.TryGetValue(categories[i], out var c) ? c : DefaultColor;
                 DrawSegment(textRect, color);
 
-                TooltipHandler.TipRegion(
-                    textRect,
-                    new TipSignal($"{TooltipLabel(categories[i])}: {TimeText(impact)}")
-                );
+                TooltipHandler.TipRegion(textRect, new TipSignal(Tooltip(categories[i], impact)));
 
                 x += width;
             }
@@ -207,10 +217,7 @@ internal sealed class ProfilerBar
                 var color = categoryColors.TryGetValue(categories[i], out var c) ? c : DefaultColor;
                 DrawSegment(textRect, color);
 
-                TooltipHandler.TipRegion(
-                    textRect,
-                    new TipSignal($"{TooltipLabel(categories[i])}: {TimeText(impact)}")
-                );
+                TooltipHandler.TipRegion(textRect, new TipSignal(Tooltip(categories[i], impact)));
 
                 xCursor += width;
                 drawn += width;

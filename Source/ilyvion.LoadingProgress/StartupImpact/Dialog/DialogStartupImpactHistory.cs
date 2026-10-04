@@ -470,11 +470,17 @@ internal sealed class DialogStartupImpactHistory : Window
             _ => throw new ArgumentOutOfRangeException(nameof(group), group, null),
         };
 
+    // A session timed only to the end of loading reads shorter than one timed to the main menu,
+    // so it says so rather than passing for a faster run.
     private static string NoteFor(StartupImpactSessionIndexEntry entry, bool comparable) =>
         entry.Completed
-            ? comparable
-                ? string.Empty
-                : "LoadingProgress.StartupImpact.History.Note.DifferentList".Translate().ToString()
+            ? !comparable
+                ? "LoadingProgress.StartupImpact.History.Note.DifferentList".Translate().ToString()
+                : entry.MeasuredToMenu
+                    ? string.Empty
+                    : "LoadingProgress.StartupImpact.History.Note.ToEndOfLoading"
+                        .Translate()
+                        .ToString()
             : string.IsNullOrEmpty(entry.LastStage)
                 ? "LoadingProgress.StartupImpact.History.Note.Unfinished".Translate().ToString()
                 : "LoadingProgress.StartupImpact.History.Note.UnfinishedAt"

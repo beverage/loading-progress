@@ -46,6 +46,8 @@ internal static class StartupImpactHtmlExporter
 
         AppendNumber(sb, "loadingTimeMs", sessionData.LoadingTime);
         _ = sb.Append(',');
+        AppendNumber(sb, "timeToMenuMs", sessionData.TimeToMenu);
+        _ = sb.Append(',');
 
         AppendKey(sb, "secondsOnly");
         _ = sb.Append(secondsOnly ? "true," : "false,");
@@ -918,16 +920,19 @@ internal static class StartupImpactHtmlExporter
       }
     });
     var baseGameTotal = DATA.baseGame.loadingTimeMs;
-    var untracked = Math.max(0, DATA.loadingTimeMs - (modsTotal + hiddenTotal + baseGameTotal));
+    // What ran between the end of loading and the main menu is counted too, so the bar spans
+    // the time to the menu when the session recorded one.
+    var windowMs = Math.max(DATA.loadingTimeMs, DATA.timeToMenuMs || 0);
+    var remaining = Math.max(0, windowMs - (modsTotal + hiddenTotal + baseGameTotal));
 
     var cats = DATA.totalCategories;
     var segments = [
       { label: cats[0].label, color: cats[0].color, valueMs: modsTotal },
       { label: cats[1].label, color: cats[1].color, valueMs: hiddenTotal },
       { label: cats[2].label, color: cats[2].color, valueMs: baseGameTotal },
-      { label: cats[3].label, color: cats[3].color, valueMs: untracked }
+      { label: cats[3].label, color: cats[3].color, valueMs: remaining }
     ];
-    renderBar(document.getElementById("totalBar"), segments, DATA.loadingTimeMs);
+    renderBar(document.getElementById("totalBar"), segments, windowMs);
     document.getElementById("modsTitle").textContent = DATA.strings.modsTitle.replace("{0}", timeText(modsTotal));
   }
 
@@ -1190,7 +1195,7 @@ internal static class StartupImpactHtmlExporter
   }
 
   document.getElementById("title").textContent =
-    DATA.strings.title.replace("{0}", timeText(DATA.loadingTimeMs));
+    DATA.strings.title.replace("{0}", timeText(Math.max(DATA.loadingTimeMs, DATA.timeToMenuMs || 0)));
 
   if (DATA.sessionStats) {
     document.getElementById("sessionStats").textContent = DATA.strings.sessionStats

@@ -680,6 +680,9 @@ internal sealed partial class LoadingProgressWindow
 
                 field = value;
 
+                // The ledger of time no category accounts for keeps its stages by the clock.
+                LoadingProgressMod.instance?.StartupImpact.NotifyStage(value);
+
                 // Record where a boot that never finishes got to. Guarded on IsActive so a
                 // disabled marker costs a bool read, not an enum name, on every transition.
                 //

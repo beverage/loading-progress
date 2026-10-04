@@ -1,4 +1,5 @@
 using DevTools.Testing;
+using ilyvion.LoadingProgress.StartupImpact;
 using ilyvion.LoadingProgress.StartupImpact.Dialog;
 
 namespace ilyvion.LoadingProgress.Tests;
@@ -141,4 +142,93 @@ internal sealed class StartupImpactSessionViewDataTests
                 (500f, 9000f, true),
             ])
         );
+
+    // The base game's largest steps, for its tooltip and its folded heading: largest first,
+    // nothing for a step with no time in it, and no more lines than asked for.
+    [Test]
+    public static void TheLargestStepsComeLargestFirstAndCapped()
+    {
+        var steps = StartupImpactSessionViewData.LargestSteps(
+            ["A", "B", "C", "D"],
+            [200f, 0f, 900f, 500f],
+            2
+        );
+
+        Expect.IsTrue(steps.Count == 2);
+        Expect.IsTrue(steps[0].Category == "C");
+        Expect.IsTrue(steps[1].Category == "D");
+    }
+
+    // Hovering the top bar's base-game and remaining segments shows the breakdowns the folded
+    // sections hold, from this startup's own session: a key for each text that exists.
+    [Test]
+    public static void TheTotalsBarTooltipsCarryBothBreakdowns()
+    {
+        var viewData = new StartupImpactSessionViewData(
+            StartupImpactSessionData.FromCurrentSession()
+        );
+
+        var details = viewData.TotalsTooltipDetails;
+        Expect.IsTrue(
+            details.ContainsKey("LoadingProgress.StartupImpact.Total.BaseGame")
+                == (viewData.BaseGameBreakdownText != null)
+        );
+        Expect.IsTrue(
+            details.ContainsKey("LoadingProgress.StartupImpact.Total.Others")
+                == (viewData.RemainingBreakdownText != null)
+        );
+        Expect.IsTrue(viewData.BasegameLoadingTime < 1f || viewData.BaseGameBreakdownText != null);
+    }
+
+    // A breakdown lists its largest lines and counts the rest, so a reader adding up the
+    // lines knows when some are missing.
+    [Test]
+    public static void ABreakdownCountsTheLinesItLeavesOut()
+    {
+        List<(string Label, float Ms)> lines =
+        [
+            .. Enumerable
+                .Range(0, StartupImpactSessionViewData.BreakdownLines + 3)
+                .Select(i => ($"Step {i}", 100f - i)),
+        ];
+
+        var shown = StartupImpactSessionViewData.Breakdown("Header:", lines).Split('\n');
+
+        Expect.AreEqual(StartupImpactSessionViewData.BreakdownLines + 2, shown.Length);
+        Expect.AreEqual("Header:", shown[0]);
+        Expect.AreEqual(
+            "LoadingProgress.StartupImpact.Breakdown.More".Translate(3).ToString(),
+            shown[^1]
+        );
+    }
+
+    [Test]
+    public static void ABreakdownThatFitsHasNoCount() =>
+        Expect.AreEqual(
+            2,
+            StartupImpactSessionViewData.Breakdown("Header:", [("Step", 5f)]).Split('\n').Length
+        );
+
+    // With the base game's off-thread bar hidden, which is the default, its folded heading
+    // names its largest step.
+    [Test]
+    public static void TheBaseGameHeadingCanNameItsLargestStep()
+    {
+        const string Small = "LoadingProgress.StartupImpact.AbstractFilesystemClearAllCache";
+        const string Large = "LoadingProgress.StartupImpact.GarbageCollection";
+        var viewData = new StartupImpactSessionViewData(
+            StartupImpactSessionData.FromValues(
+                10000f,
+                0f,
+                new() { [Small] = 1000f, [Large] = 3000f },
+                [],
+                []
+            )
+        );
+
+        Expect.AreEqual(
+            $"{StartupImpactProfilerUtil.TranslateCategory(Large)}: {ProfilerBar.TimeText(3000f)}",
+            viewData.LargestBaseGameStepText
+        );
+    }
 }

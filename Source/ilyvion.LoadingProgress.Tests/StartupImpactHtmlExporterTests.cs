@@ -66,4 +66,34 @@ internal sealed class StartupImpactHtmlExporterTests
             )
         );
     }
+
+    // The report's folded headings carry a detail as the window's do, its breakdowns list as
+    // many lines as the window's tooltips, and every bar for time on other threads says so.
+    [Test]
+    public static void TheReportsSectionsCarryTheWindowsDetailsAndTooltips()
+    {
+        var html = Report(new StartupImpactSessionViewData(Session));
+
+        Expect.IsTrue(html.Contains("id=\"baseGameDetail\"", StringComparison.Ordinal));
+        Expect.IsTrue(html.Contains("id=\"remainingDetail\"", StringComparison.Ordinal));
+        Expect.IsTrue(
+            html.Contains(
+                $"\"breakdownLines\":{StartupImpactSessionViewData.BreakdownLines},",
+                StringComparison.Ordinal
+            )
+        );
+        var tip = "LoadingProgress.StartupImpact.OnOtherThreads.Tip".Translate().ToString();
+        Expect.IsTrue(html.Contains($"\"onOtherThreadsTip\":\"{tip}\"", StringComparison.Ordinal));
+        foreach (
+            var call in new[]
+            {
+                "renderBar(offBar, mod.offThreadMetrics, rowMaxImpact, DATA.strings.onOtherThreadsTip);",
+                "renderBar(offBar, phase.offThreadSegments, maxImpact, DATA.strings.onOtherThreadsTip);",
+                "renderBar(offBar, DATA.baseGame.offThreadSegments, maxImpact, DATA.strings.onOtherThreadsTip);",
+            }
+        )
+        {
+            Expect.IsTrue(html.Contains(call, StringComparison.Ordinal));
+        }
+    }
 }

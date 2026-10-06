@@ -27,7 +27,7 @@ namespace ilyvion.LoadingProgress.StartupImpact;
 /// </remarks>
 internal static class PostLoadTracker
 {
-    private const string Category = "LoadingProgress.StartupImpact.PostLoadLongEvent";
+    internal const string Category = "LoadingProgress.StartupImpact.PostLoadLongEvent";
 
     // Two idle frames closer together than this mean the menu is drawing freely; a wait
     // between frames longer than this, while the game was in the background, was a pause.
@@ -165,6 +165,7 @@ internal static class PostLoadTracker
     /// </summary>
     internal static void RunAsOwnWork(string description, Action work)
     {
+        TimeOnThisThread();
         var resume = _current;
         StopCurrent(0f);
         var mod = LoadingProgressMod.instance.Content;
@@ -289,18 +290,36 @@ internal static class PostLoadTracker
         }
     }
 
+    // Everything after loading runs on the main thread, and only the active thread's timings
+    // count toward the totals and the stage ledger, or can have a pause taken off. The
+    // deferred-task replacement makes the main thread the active one, but that patch is
+    // skipped when the settings turn the initialization patches off, so the tracker does it
+    // too before it times anything.
+    private static void TimeOnThisThread() =>
+        LoadingProgressMod.instance.StartupImpact.UpdateActiveThreadId();
+
     private static void StartCurrent(LongEventHandler.QueuedLongEvent queuedEvent)
     {
         _current = queuedEvent;
         _currentCategory = $"{Category}|{Describe(queuedEvent)}";
         _currentOwner = OwnerOf(queuedEvent);
-        if (_currentOwner == null)
+        StartTiming(_currentOwner, _currentCategory);
+    }
+
+    /// <summary>
+    /// Starts <paramref name="category"/> under <paramref name="owner"/>, or under the base
+    /// game when it is null, making this thread, the main one, the active thread first.
+    /// </summary>
+    internal static void StartTiming(ModContentPack? owner, string category)
+    {
+        TimeOnThisThread();
+        if (owner == null)
         {
-            StartupImpactProfilerUtil.StartBaseGameProfiler(_currentCategory);
+            StartupImpactProfilerUtil.StartBaseGameProfiler(category);
         }
         else
         {
-            StartupImpactProfilerUtil.StartModProfiler(_currentOwner, _currentCategory);
+            StartupImpactProfilerUtil.StartModProfiler(owner, category);
         }
     }
 

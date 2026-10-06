@@ -3,9 +3,13 @@ using ilyvion.LoadingProgress.StartupImpact;
 
 namespace ilyvion.LoadingProgress.Tests;
 
+// Some of these tests wait through the startup's tail, while other mods' post-load events run.
 [TestFixture(TestType.MainMenu)]
+[WarningsAllowed(TestStartup.OtherModsWarnings)]
 internal sealed class PostLoadTrackerTests
 {
+    private const string TrackingOff = "Startup impact tracking is off.";
+
     [Test]
     public static void TheFirstIdleFrameNeverSettlesTheMenu() =>
         Expect.IsFalse(PostLoadTracker.IsMenuSettled(-1f, 100000f, 1));
@@ -123,6 +127,100 @@ internal sealed class PostLoadTrackerTests
                 patch.PatchMethod.DeclaringType == typeof(LongEventHandler_LongEventsUpdate_Patches)
             )
         );
+    }
+
+    // With the initialization patches off in the settings, nothing used to make the main
+    // thread the active one after loading, so a long event timed there went to the off-thread
+    // figures, which the totals never see and a pause cannot be taken off.
+    [Test]
+    public static IEnumerator AnEventTimedAfterLoadingCountsOnTheMainThread()
+    {
+        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        {
+            Test.Skip(TrackingOff);
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
+        }
+
+        var category = $"{PostLoadTracker.Category}|{nameof(PostLoadTrackerTests)}.Event";
+        var startupImpact = LoadingProgressMod.instance.StartupImpact;
+        var profiler = startupImpact.BaseGameProfiler;
+
+        // As though the loading thread were still the active one.
+        Task.Run(startupImpact.UpdateActiveThreadId).Wait();
+        try
+        {
+            Expect.IsFalse(startupImpact.IsActiveThread());
+
+            PostLoadTracker.StartTiming(null, category);
+            StartupImpactProfilerUtil.StopBaseGameProfiler(category);
+
+            Expect.IsTrue(startupImpact.IsActiveThread());
+            Expect.IsTrue(profiler.Metrics.ContainsKey(category));
+        }
+        finally
+        {
+            startupImpact.UpdateActiveThreadId();
+            Forget(profiler, category);
+        }
+    }
+
+    // The same for Loading Progress's own work after loading, such as saving its report.
+    [Test]
+    public static IEnumerator WorkTimedAfterLoadingCountsOnTheMainThread()
+    {
+        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        {
+            Test.Skip(TrackingOff);
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
+        }
+
+        const string description = nameof(PostLoadTrackerTests);
+        var category = $"{PostLoadTracker.Category}|{description}";
+        var startupImpact = LoadingProgressMod.instance.StartupImpact;
+        var info = startupImpact.Modlist.GetModInfoFor(LoadingProgressMod.instance.Content);
+        Expect.IsNotNull(info);
+        var profiler = info!.Profiler;
+
+        // As though the loading thread were still the active one.
+        Task.Run(startupImpact.UpdateActiveThreadId).Wait();
+        try
+        {
+            Expect.IsFalse(startupImpact.IsActiveThread());
+
+            PostLoadTracker.RunAsOwnWork(description, () => { });
+
+            Expect.IsTrue(startupImpact.IsActiveThread());
+            Expect.IsTrue(profiler.Metrics.ContainsKey(category));
+        }
+        finally
+        {
+            startupImpact.UpdateActiveThreadId();
+            Forget(profiler, category);
+        }
+    }
+
+    // Takes a test's category back out of the live session, totals included. The test waited
+    // for the startup to complete, so the stage ledger, closed by then, holds none of it.
+    private static void Forget(Profiler profiler, string category)
+    {
+        if (profiler.Metrics.TryGetValue(category, out var ms))
+        {
+            profiler.Discount(category, ms);
+            _ = profiler.Metrics.TryRemove(category, out _);
+        }
+        _ = profiler.OffThreadMetrics.TryRemove(category, out _);
     }
 
     [Test]

@@ -2,10 +2,9 @@ using DevTools.Testing;
 
 namespace ilyvion.LoadingProgress.Tests;
 
-// These tests wait through the startup's tail, where other mods' post-load events run; what
-// those log in that time is theirs, not a failure here.
+// These tests wait through the startup's tail, while other mods' post-load events run.
 [TestFixture(TestType.MainMenu)]
-[WarningsAllowed(".*")]
+[WarningsAllowed(TestStartup.OtherModsWarnings)]
 internal sealed class LoadingTimeTests
 {
     // Room for the frame between the two timers starting and the settings write between them

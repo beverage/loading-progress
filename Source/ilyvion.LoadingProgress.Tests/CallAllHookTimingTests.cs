@@ -4,7 +4,9 @@ using ilyvion.LoadingProgress.StartupImpact;
 
 namespace ilyvion.LoadingProgress.Tests;
 
+// Some of these tests wait through the startup's tail, while other mods' post-load events run.
 [TestFixture(TestType.MainMenu)]
+[WarningsAllowed(TestStartup.OtherModsWarnings)]
 internal sealed class CallAllHookTimingTests
 {
     private const string TestHarmonyId = "ilyvion.LoadingProgress.Tests.CallAllHookTiming";
@@ -45,12 +47,18 @@ internal sealed class CallAllHookTimingTests
     // One heading naming every mod with a hook on the call cannot be hidden with the mod it
     // belongs to; a hook timed under its own mod can.
     [Test]
-    public static void AHookIsTimedUnderTheModThatOwnsIt()
+    public static IEnumerator AHookIsTimedUnderTheModThatOwnsIt()
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
             Test.Skip(TrackingOff);
-            return;
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
         }
 
         Expect.GreaterThanOrEqualTo(TimedUnderOwnMod(nameof(SlowPostfix)), 4f);
@@ -60,12 +68,18 @@ internal sealed class CallAllHookTimingTests
     // instead of a call to it, and a detour put on the hook afterwards is never reached from
     // there unless the replacement is built again once the detour is in place.
     [Test]
-    public static void AHookSmallEnoughToBeInlinedIsStillTimed()
+    public static IEnumerator AHookSmallEnoughToBeInlinedIsStillTimed()
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
             Test.Skip(TrackingOff);
-            return;
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
         }
 
         Expect.GreaterThanOrEqualTo(TimedUnderOwnMod(nameof(ThinPostfix)), 4f);
@@ -74,12 +88,18 @@ internal sealed class CallAllHookTimingTests
     // The call's own category stops while a hook runs, or every hook's time would be counted
     // twice: on its mod, and again under the call.
     [Test]
-    public static void TheCallsCategoryPausesWhileAHookRuns()
+    public static IEnumerator TheCallsCategoryPausesWhileAHookRuns()
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
             Test.Skip(TrackingOff);
-            return;
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
         }
 
         var harmony = new Harmony(TestHarmonyId);
@@ -105,12 +125,18 @@ internal sealed class CallAllHookTimingTests
     // the call's category stops cleanly; stopping one that is not running logs an error,
     // which fails the test.
     [Test]
-    public static void AHookThatThrowsLeavesTheTimingIntact()
+    public static IEnumerator AHookThatThrowsLeavesTheTimingIntact()
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
             Test.Skip(TrackingOff);
-            return;
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
         }
 
         var harmony = new Harmony(TestHarmonyId);

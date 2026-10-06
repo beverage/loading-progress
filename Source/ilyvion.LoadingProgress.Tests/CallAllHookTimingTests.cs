@@ -220,6 +220,65 @@ internal sealed class CallAllHookTimingTests
         Expect.IsFalse(text.Contains("{0}", StringComparison.Ordinal));
     }
 
+    [Test]
+    public static void AModsHookIsTimed() =>
+        Expect.AreEqual(
+            CallAllHookTiming.HookHandling.Time,
+            CallAllHookTiming.HandlingFor(typeof(CallAllHookTimingTests).Assembly, false, OwnMod())
+        );
+
+    [Test]
+    public static void LoadingProgressesOwnHooksAreLeftAlone() =>
+        Expect.AreEqual(
+            CallAllHookTiming.HookHandling.Skip,
+            CallAllHookTiming.HandlingFor(typeof(CallAllHookTiming).Assembly, false, OwnMod())
+        );
+
+    [Test]
+    public static void AHookNoModOwnsIsNamedAsUntimed() =>
+        Expect.AreEqual(
+            CallAllHookTiming.HookHandling.NameAsUntimed,
+            CallAllHookTiming.HandlingFor(typeof(Harmony).Assembly, false, null)
+        );
+
+    // A hook generated at run time has no declaring type to find its mod by. Its time stays
+    // under the call's heading, which used to leave it unnamed.
+    [Test]
+    public static void AHookWithNoTypeIsNamedAsUntimed() =>
+        Expect.AreEqual(
+            CallAllHookTiming.HookHandling.NameAsUntimed,
+            CallAllHookTiming.HandlingFor(null, false, null)
+        );
+
+    // A method listed as both a prefix and a postfix is timed once, from its first entry. The
+    // second entry used to name its mod as untimed, though all its time sat on its own row.
+    [Test]
+    public static void AHookListedTwiceIsTimedAndNotNamedAsUntimed()
+    {
+        var harmony = new Harmony(TestHarmonyId);
+        var hook = new HarmonyMethod(typeof(CallAllHookTimingTests), nameof(SlowPostfix));
+        _ = harmony.Patch(TargetMethod, prefix: hook, postfix: hook);
+        try
+        {
+            var timing = CallAllHookTiming.Install(TargetMethod);
+            try
+            {
+                Expect.IsEmpty(timing.UntimedOwners);
+                Expect.IsTrue(
+                    Harmony.GetPatchInfo(HookMethod).Owners.Contains(CallAllHookTiming.HarmonyId)
+                );
+            }
+            finally
+            {
+                timing.Remove();
+            }
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
     // Times one call of the target under the test's own base-game category, the way the
     // startup times the engine's pass, with the timing patches on for the call only.
     private static void TimedCall(Action? call = null)
@@ -270,8 +329,11 @@ internal sealed class CallAllHookTimingTests
         }
     }
 
+    private static ModContentPack? OwnMod() =>
+        Utilities.FindModByAssembly(typeof(CallAllHookTimingTests).Assembly);
+
     private static ModInfo? OwnModInfo() =>
-        Utilities.FindModByAssembly(typeof(CallAllHookTimingTests).Assembly) is { } mod
+        OwnMod() is { } mod
             ? LoadingProgressMod.instance.StartupImpact.Modlist.GetModInfoFor(mod)
             : null;
 

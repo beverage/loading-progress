@@ -44,8 +44,9 @@ internal sealed class CallAllHookTiming
     internal static string? BaseCategory { get; set; }
 
     /// <summary>
-    /// Patches every prefix, postfix and finalizer other mods have on <paramref name="target"/>
-    /// so each is timed under its owner. Transpilers are not hooks and are left alone.
+    /// Patches every prefix, postfix, finalizer, inner prefix and inner postfix other mods have
+    /// on <paramref name="target"/> so each is timed under its owner. Transpilers are not hooks
+    /// and are left alone.
     /// </summary>
     internal static CallAllHookTiming Install(MethodBase target)
     {
@@ -58,43 +59,20 @@ internal sealed class CallAllHookTiming
             return timing;
         }
 
-        foreach (var patch in patches.Prefixes.Concat(patches.Postfixes).Concat(patches.Finalizers))
+        var handled = new HashSet<MethodBase>();
+        foreach (var patch in HooksIn(patches))
         {
             var method = patch.PatchMethod;
             var assembly = method?.DeclaringType?.Assembly;
-            if (method == null || assembly == null || assembly == Assembly.GetExecutingAssembly())
+            var mod = assembly == null ? null : Utilities.FindModByAssembly(assembly);
+            var handling = HandlingFor(assembly, method != null && !handled.Add(method), mod);
+            if (handling == HookHandling.NameAsUntimed)
             {
-                continue;
+                timing.AddUntimed(mod?.Name ?? patch.owner);
             }
-
-            var mod = Utilities.FindModByAssembly(assembly);
-            var ownerName = mod?.Name ?? patch.owner;
-            if (mod == null || _timed.ContainsKey(method))
+            else if (handling == HookHandling.Time && method != null && mod != null)
             {
-                timing.AddUntimed(ownerName);
-                continue;
-            }
-
-            try
-            {
-                _timed[method] = new Timed(
-                    mod,
-                    $"{Category}|{method.DeclaringType.Name}.{method.Name}"
-                );
-                _ = timing._harmony.Patch(
-                    method,
-                    prefix: new HarmonyMethod(typeof(CallAllHookTiming), nameof(Prefix)),
-                    finalizer: new HarmonyMethod(typeof(CallAllHookTiming), nameof(Finalizer))
-                );
-                timing._patched.Add(method);
-            }
-            catch (Exception e)
-            {
-                _ = _timed.Remove(method);
-                timing.AddUntimed(ownerName);
-                LoadingProgressMod.Warning(
-                    $"Could not time {ownerName}'s hook {method.DeclaringType?.Name}.{method.Name} on its own: {e.Message}"
-                );
+                timing.TimeHook(method, mod);
             }
         }
 
@@ -104,6 +82,72 @@ internal sealed class CallAllHookTiming
         }
         timing._untimedOwners.Sort(StringComparer.Ordinal);
         return timing;
+    }
+
+    private static IEnumerable<Patch> HooksIn(HarmonyLib.Patches patches) =>
+        patches
+            .Prefixes.Concat(patches.Postfixes)
+            .Concat(patches.Finalizers)
+            .Concat(patches.InnerPrefixes)
+            .Concat(patches.InnerPostfixes);
+
+    /// <summary>
+    /// What <see cref="Install"/> does with one hook on the call.
+    /// </summary>
+    internal enum HookHandling
+    {
+        /// <summary>Times it under its mod.</summary>
+        Time,
+
+        /// <summary>Names its owner on the call's heading, where its time stays.</summary>
+        NameAsUntimed,
+
+        /// <summary>
+        /// Leaves it alone: one of Loading Progress's own, or one handled at an earlier entry.
+        /// </summary>
+        Skip,
+    }
+
+    /// <summary>
+    /// What to do with a hook whose method comes from <paramref name="assembly"/> and belongs
+    /// to <paramref name="mod"/>. The assembly is null when the method has no declaring type to
+    /// find it by, as a generated method can. A method listed a second time, as both a prefix
+    /// and a postfix for instance, was handled at its first entry, whether its patch took or
+    /// not.
+    /// </summary>
+    internal static HookHandling HandlingFor(
+        Assembly? assembly,
+        bool alreadyHandled,
+        ModContentPack? mod
+    ) =>
+        assembly == typeof(CallAllHookTiming).Assembly || alreadyHandled ? HookHandling.Skip
+        : assembly == null || mod == null ? HookHandling.NameAsUntimed
+        : HookHandling.Time;
+
+    // Puts the timing patches on one hook, or names its owner when that fails.
+    private void TimeHook(MethodInfo method, ModContentPack mod)
+    {
+        try
+        {
+            _timed[method] = new Timed(
+                mod,
+                $"{Category}|{method.DeclaringType?.Name}.{method.Name}"
+            );
+            _ = _harmony.Patch(
+                method,
+                prefix: new HarmonyMethod(typeof(CallAllHookTiming), nameof(Prefix)),
+                finalizer: new HarmonyMethod(typeof(CallAllHookTiming), nameof(Finalizer))
+            );
+            _patched.Add(method);
+        }
+        catch (Exception e)
+        {
+            _ = _timed.Remove(method);
+            AddUntimed(mod.Name);
+            LoadingProgressMod.Warning(
+                $"Could not time {mod.Name}'s hook {method.DeclaringType?.Name}.{method.Name} on its own: {e.Message}"
+            );
+        }
     }
 
     /// <summary>

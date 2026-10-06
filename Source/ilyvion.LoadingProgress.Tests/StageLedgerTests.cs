@@ -98,6 +98,22 @@ internal sealed class StageLedgerTests
         Expect.AreApproximatelyEqual(0f, ledger.Entries[1].WallMs);
     }
 
+    // The deferred-task replacement begins the second pass's stage each time it is entered,
+    // and it can be entered again before the interface initializes. Each entry used to add
+    // another entry with the same label, which the remaining bar listed as one more segment.
+    [Test]
+    public static void BeginningTheRunningStageAgainKeepsOneEntry()
+    {
+        var ledger = new StageLedger("Initializing");
+        ledger.Begin("ExecuteToExecuteWhenFinished2", 1000f);
+        ledger.Begin("ExecuteToExecuteWhenFinished2", 1400f);
+        ledger.Close(2000f);
+
+        var entries = ledger.Entries;
+        Expect.AreEqual(2, entries.Count);
+        Expect.AreApproximatelyEqual(1000f, entries[1].WallMs);
+    }
+
     [Test]
     public static void AStageNeverEndsBeforeItBegan()
     {

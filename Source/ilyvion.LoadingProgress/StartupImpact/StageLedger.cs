@@ -32,13 +32,14 @@ internal sealed class StageLedger
     }
 
     /// <summary>
-    /// Starts a stage at <paramref name="nowMs"/>, ending the one before it there.
+    /// Starts a stage at <paramref name="nowMs"/>, ending the one before it there. Beginning
+    /// the stage that is already running changes nothing.
     /// </summary>
     public void Begin(string stage, float nowMs)
     {
         lock (_lock)
         {
-            if (_closed)
+            if (_closed || string.Equals(_entries[^1].Stage, stage, StringComparison.Ordinal))
             {
                 return;
             }

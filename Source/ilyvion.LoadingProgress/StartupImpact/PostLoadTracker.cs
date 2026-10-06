@@ -399,7 +399,7 @@ internal static class PostLoadTracker
     /// </summary>
     internal static string DescribeCode(Type? type, string memberName)
     {
-        while (type?.DeclaringType != null && IsCompilerGenerated(type))
+        while (type?.DeclaringType != null && CompilerGenerated.Is(type))
         {
             type = type.DeclaringType;
         }
@@ -409,9 +409,6 @@ internal static class PostLoadTracker
             : name.StartsWith('.') ? $"{type.FullName}{name}"
             : $"{type.FullName}.{name}";
     }
-
-    private static bool IsCompilerGenerated(Type type) =>
-        type.Name.StartsWith('<') || type.IsDefined(typeof(CompilerGeneratedAttribute), false);
 
     private static string WrittenName(string name)
     {

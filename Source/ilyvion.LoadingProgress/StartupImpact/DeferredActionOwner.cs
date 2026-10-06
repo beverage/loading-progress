@@ -45,7 +45,7 @@ internal static class DeferredActionOwner
         }
 
         var type = target.GetType();
-        if (!IsCompilerGeneratedClosure(type))
+        if (!CompilerGenerated.Is(type))
         {
             return null;
         }
@@ -72,10 +72,6 @@ internal static class DeferredActionOwner
         return null;
     }
 
-    private static bool IsCompilerGeneratedClosure(Type type) =>
-        type.Name.Contains("<>c__DisplayClass", StringComparison.Ordinal)
-        || type.IsDefined(typeof(CompilerGeneratedAttribute), false);
-
     private static FieldInfo[] ClosureFields(Type type)
     {
         lock (_closureFieldsByType)
@@ -91,7 +87,7 @@ internal static class DeferredActionOwner
                 .Where(field =>
                     typeof(Def).IsAssignableFrom(field.FieldType)
                     || typeof(ModContentPack).IsAssignableFrom(field.FieldType)
-                    || IsCompilerGeneratedClosure(field.FieldType)
+                    || CompilerGenerated.Is(field.FieldType)
                 )
                 .ToArray();
             _closureFieldsByType[type] = fields;

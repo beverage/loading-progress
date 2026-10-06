@@ -23,7 +23,13 @@ internal sealed class Profiler(string measurementTarget) : IDisposable
             return;
         }
 
-        _threadLocalProfiler.Value.Start(category);
+        // A category open on this thread pauses while this one runs, and what it ran until now
+        // is its own.
+        var ms = _threadLocalProfiler.Value.Start(category, out var interrupted);
+        if (interrupted != null)
+        {
+            Record(interrupted, ms);
+        }
     }
 
     public float Stop(string category)
@@ -34,14 +40,19 @@ internal sealed class Profiler(string measurementTarget) : IDisposable
         }
 
         var ms = _threadLocalProfiler.Value.Stop(category, out var actualCategory);
+        Record(actualCategory, ms);
+        return ms;
+    }
 
+    private void Record(string category, float ms)
+    {
         if (LoadingProgressMod.instance.StartupImpact.IsActiveThread())
         {
             TotalImpact += ms;
 
-            _ = Metrics.TryGetValue(actualCategory, out var total);
+            _ = Metrics.TryGetValue(category, out var total);
             total += ms;
-            Metrics[actualCategory] = total;
+            Metrics[category] = total;
 
             var startupImpact = LoadingProgressMod.instance.StartupImpact;
             startupImpact.StageLedger.Attribute(ms, startupImpact.ElapsedMs);
@@ -50,10 +61,8 @@ internal sealed class Profiler(string measurementTarget) : IDisposable
         {
             InterlockedAdd(ref _offThreadTotalImpact, ms);
 
-            _ = OffThreadMetrics.AddOrUpdate(actualCategory, ms, (_, total) => total + ms);
+            _ = OffThreadMetrics.AddOrUpdate(category, ms, (_, total) => total + ms);
         }
-
-        return ms;
     }
 
     /// <summary>

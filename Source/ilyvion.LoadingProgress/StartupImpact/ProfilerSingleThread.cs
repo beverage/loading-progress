@@ -22,19 +22,32 @@ internal abstract class SingleThreadedProfiler(string measurementTarget)
         get => field == null ? "" : $"{field} profiler";
     } = measurementTarget;
 
-    public void Start(string category)
+    public void Start(string category) => _ = Start(category, out _);
+
+    /// <summary>
+    /// Starts timing <paramref name="category"/>, inside whatever category is open.
+    /// </summary>
+    /// <returns>
+    /// The milliseconds the open category ran since it last started, which are that
+    /// category's, with its name in <paramref name="interrupted"/>; 0 and null when no
+    /// category was open.
+    /// </returns>
+    public float Start(string category, out string? interrupted)
     {
+        interrupted = null;
         if (string.IsNullOrEmpty(category))
         {
-            return;
+            return 0f;
         }
 
         lock (_modificationLock)
         {
+            var ms = 0f;
             if (_categories.Count > 0)
             {
-                var ms = StopAndStart();
+                ms = StopAndStart();
                 Total += ms;
+                interrupted = _categories[0];
             }
             else
             {
@@ -42,6 +55,7 @@ internal abstract class SingleThreadedProfiler(string measurementTarget)
             }
 
             _categories.Insert(0, category);
+            return ms;
         }
     }
 

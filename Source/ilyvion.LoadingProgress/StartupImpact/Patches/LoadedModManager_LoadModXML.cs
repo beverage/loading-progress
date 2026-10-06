@@ -28,36 +28,45 @@ internal static class LoadedModManager_LoadModXML
             return original;
         }
 
-        _ = codeMatcher
-            .Advance(1)
-            .InsertAndAdvance([
-                new(OpCodes.Ldloc_2),
-                new(
-                    OpCodes.Call,
-                    AccessTools.Method(typeof(LoadedModManager_LoadModXML), nameof(BeforeLoadDefs))
-                ),
-            ])
-            .Advance(1)
-            .InsertAndAdvance([
-                new(OpCodes.Ldloc_2),
-                new(
-                    OpCodes.Call,
-                    AccessTools.Method(typeof(LoadedModManager_LoadModXML), nameof(AfterLoadDefs))
-                ),
-            ]);
+        // Each mod's defs load through LoadDefsTimed, which takes the same arguments.
+        _ = codeMatcher.Set(
+            OpCodes.Call,
+            AccessTools.Method(typeof(LoadedModManager_LoadModXML), nameof(LoadDefsTimed))
+        );
 
         return codeMatcher.Instructions();
     }
 
-    private static void BeforeLoadDefs(ModContentPack modContentPack) =>
+    /// <summary>
+    /// Loads one mod's defs, timed under that mod.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ModContentPack.LoadDefs"/> is an iterator, so its work happens as its defs
+    /// are read, and only the reading is timed. The call before it, where other mods' hooks on
+    /// LoadDefs run, stays outside the category. The category closes in a finally: the engine
+    /// catches a mod whose defs fail to load and goes on to the next mod, and a category left
+    /// open would take in that mod's later steps.
+    /// </remarks>
+    internal static IEnumerable<LoadableXmlAsset> LoadDefsTimed(
+        ModContentPack modContentPack,
+        bool hotReload
+    )
+    {
+        var defs = modContentPack.LoadDefs(hotReload);
         StartupImpactProfilerUtil.StartModProfiler(
             modContentPack,
             "LoadingProgress.StartupImpact.LoadDefs"
         );
-
-    private static void AfterLoadDefs(ModContentPack modContentPack) =>
-        StartupImpactProfilerUtil.StopModProfiler(
-            modContentPack,
-            "LoadingProgress.StartupImpact.LoadDefs"
-        );
+        try
+        {
+            return [.. defs];
+        }
+        finally
+        {
+            StartupImpactProfilerUtil.StopModProfiler(
+                modContentPack,
+                "LoadingProgress.StartupImpact.LoadDefs"
+            );
+        }
+    }
 }

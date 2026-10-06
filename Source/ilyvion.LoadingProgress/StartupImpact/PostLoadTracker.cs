@@ -47,6 +47,7 @@ internal static class PostLoadTracker
 
     private static bool _watchingFrames;
     private static float _frameEndMs = -1f;
+    private static float _frameStartMs = -1f;
     private static bool _unfocusedSinceFrameEnd;
     private static float _pausedMs;
 
@@ -71,8 +72,9 @@ internal static class PostLoadTracker
 
         WatchFrames();
         var now = RealtimeMs;
-        var paused = PauseIn(
+        var paused = PauseBeforeThisFrame(
             _frameEndMs,
+            _frameStartMs,
             now,
             _unfocusedSinceFrameEnd,
             Application.runInBackground
@@ -127,6 +129,19 @@ internal static class PostLoadTracker
         {
             _lastIdleFrameMs = -1f;
             _idleFrames = 0;
+        }
+    }
+
+    /// <summary>
+    /// Notes when this frame's long-event work begins. A pause in the background ends there,
+    /// and what the frame goes on to run, such as a synchronous event that takes seconds, is
+    /// the startup's own time.
+    /// </summary>
+    internal static void MarkFrameStart()
+    {
+        if (!_done)
+        {
+            _frameStartMs = RealtimeMs;
         }
     }
 
@@ -200,13 +215,34 @@ internal static class PostLoadTracker
         && (nowMs - lastIdleFrameMs < QuickFrameMs || idleFrames >= SlowMenuIdleFrames);
 
     /// <summary>
-    /// How much of the wait from the end of the last frame to <paramref name="nowMs"/> the game
-    /// sat paused: all of it when the wait was longer than a frame, the game was in the
-    /// background at some point since that frame ended, and it does not run there; else none.
+    /// The pause before this frame: the wait from the end of the last frame to
+    /// <paramref name="frameStartMs"/>, where this frame's long events begin, or to
+    /// <paramref name="nowMs"/> when no frame start was recorded. What the frame's long events
+    /// then run, such as a synchronous event that takes seconds, is not part of it.
+    /// </summary>
+    internal static float PauseBeforeThisFrame(
+        float frameEndMs,
+        float frameStartMs,
+        float nowMs,
+        bool unfocusedSinceFrameEnd,
+        bool runInBackground
+    ) =>
+        PauseIn(
+            frameEndMs,
+            frameStartMs >= 0f ? frameStartMs : nowMs,
+            unfocusedSinceFrameEnd,
+            runInBackground
+        );
+
+    /// <summary>
+    /// How much of the wait from the end of the last frame to <paramref name="frameStartMs"/>,
+    /// where this frame's long-event work begins, the game sat paused: all of it when the wait
+    /// was longer than a frame, the game was in the background at some point since that frame
+    /// ended, and it does not run there; else none.
     /// </summary>
     internal static float PauseIn(
         float frameEndMs,
-        float nowMs,
+        float frameStartMs,
         bool unfocusedSinceFrameEnd,
         bool runInBackground
     )
@@ -216,7 +252,7 @@ internal static class PostLoadTracker
             return 0f;
         }
 
-        var waitMs = nowMs - frameEndMs;
+        var waitMs = frameStartMs - frameEndMs;
         return waitMs > QuickFrameMs ? waitMs : 0f;
     }
 

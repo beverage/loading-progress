@@ -9,6 +9,9 @@ namespace ilyvion.LoadingProgress;
 [HarmonyPatch(typeof(LongEventHandler), nameof(LongEventHandler.LongEventsUpdate))]
 internal static class LongEventHandler_LongEventsUpdate_Patches
 {
+    // Before the frame's long events run: where a pause in the background ends.
+    private static void Prefix() => PostLoadTracker.MarkFrameStart();
+
     private static void Postfix()
     {
         PostLoadTracker.Update();

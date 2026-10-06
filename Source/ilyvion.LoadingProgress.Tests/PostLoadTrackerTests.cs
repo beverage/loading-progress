@@ -79,6 +79,52 @@ internal sealed class PostLoadTrackerTests
             PostLoadTracker.PauseIn(-1f, 601000f, unfocusedSinceFrameEnd: true, false)
         );
 
+    // A synchronous long event runs inside LongEventsUpdate, before the tracker looks in its
+    // postfix. The pause used to be measured up to that look, so an event that ran for seconds
+    // in the frame after a pause was taken off with it; it ends where the frame's long events
+    // begin.
+    [Test]
+    public static void AnEventInTheFrameAfterAPauseIsNotPartOfIt() =>
+        Expect.AreApproximatelyEqual(
+            60000f,
+            PostLoadTracker.PauseBeforeThisFrame(
+                1000f,
+                61000f,
+                64000f,
+                unfocusedSinceFrameEnd: true,
+                false
+            )
+        );
+
+    [Test]
+    public static void WithNoFrameStartThePauseRunsToNow() =>
+        Expect.AreApproximatelyEqual(
+            63000f,
+            PostLoadTracker.PauseBeforeThisFrame(
+                1000f,
+                -1f,
+                64000f,
+                unfocusedSinceFrameEnd: true,
+                false
+            )
+        );
+
+    // The frame start comes from the tracker's prefix on LongEventsUpdate.
+    [Test]
+    public static void TheFrameStartIsRecordedBeforeTheFramesLongEvents()
+    {
+        var patches = Harmony.GetPatchInfo(
+            AccessTools.Method(typeof(LongEventHandler), nameof(LongEventHandler.LongEventsUpdate))
+        );
+
+        Expect.IsNotNull(patches);
+        Expect.IsTrue(
+            patches.Prefixes.Any(patch =>
+                patch.PatchMethod.DeclaringType == typeof(LongEventHandler_LongEventsUpdate_Patches)
+            )
+        );
+    }
+
     [Test]
     public static void AnEventIsNamedByItsTextWhenTheKeyTranslates() =>
         Expect.AreEqual(

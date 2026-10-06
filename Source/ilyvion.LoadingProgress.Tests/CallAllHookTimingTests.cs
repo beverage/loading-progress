@@ -250,6 +250,51 @@ internal sealed class CallAllHookTimingTests
             CallAllHookTiming.HandlingFor(null, false, null)
         );
 
+    // The engine's CallAll pass runs only to fire other mods' hooks, so a failure while timing
+    // them must not keep it from running. An exception out of the timing used to skip the
+    // call, and could leave timing patches on hook methods for the rest of the session. The
+    // hooks then all run untimed, so the heading names their owners.
+    [Test]
+    [WarningsAllowed("Could not time the hooks on")]
+    public static void ATimingThatFailsTakesItsPatchesOffAgain()
+    {
+        var harmony = new Harmony(TestHarmonyId);
+        _ = harmony.Patch(
+            TargetMethod,
+            prefix: new HarmonyMethod(typeof(CallAllHookTimingTests), nameof(SlowPostfix)),
+            postfix: new HarmonyMethod(typeof(CallAllHookTimingTests), nameof(ThinPostfix))
+        );
+        CallAllHookTiming? timing = null;
+        try
+        {
+            // The first hook is patched before the lookup for the second one fails; every
+            // lookup after that fails too, so the owner is named by its Harmony id.
+            var lookups = 0;
+            timing = CallAllHookTiming.Install(
+                TargetMethod,
+                assembly =>
+                    ++lookups == 1
+                        ? Utilities.FindModByAssembly(assembly)
+                        : throw new InvalidOperationException(
+                            "A mod lookup that fails, for the test."
+                        )
+            );
+
+            Expect.GreaterThanOrEqualTo(lookups, 2);
+            Expect.AreEqual(1, timing.UntimedOwners.Count);
+            Expect.AreEqual(TestHarmonyId, timing.UntimedOwners[0]);
+            var onHook = Harmony.GetPatchInfo(HookMethod);
+            Expect.IsTrue(onHook == null || !onHook.Owners.Contains(CallAllHookTiming.HarmonyId));
+        }
+        finally
+        {
+            // Takes off whatever a regressed install left behind, so the tests after this one
+            // start clean.
+            timing?.Remove();
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
     // A method listed as both a prefix and a postfix is timed once, from its first entry. The
     // second entry used to name its mod as untimed, though all its time sat on its own row.
     [Test]

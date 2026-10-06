@@ -22,6 +22,7 @@ internal sealed class CallAllHookTiming
 
     private static readonly Dictionary<MethodBase, Timed> _timed = [];
     private static int _depth;
+    private static bool _warnedFromHook;
 
     private readonly Harmony _harmony = new(HarmonyId);
     private readonly List<MethodBase> _patched = [];
@@ -48,39 +49,39 @@ internal sealed class CallAllHookTiming
     /// on <paramref name="target"/> so each is timed under its owner. Transpilers are not hooks
     /// and are left alone.
     /// </summary>
-    internal static CallAllHookTiming Install(MethodBase target)
+    internal static CallAllHookTiming Install(MethodBase target) =>
+        Install(target, Utilities.FindModByAssembly);
+
+    /// <summary>
+    /// <see cref="Install(MethodBase)"/>, finding each hook's mod with
+    /// <paramref name="findMod"/>.
+    /// </summary>
+    /// <remarks>
+    /// Never throws. The engine's call runs to fire other mods' hooks, so a failure here must
+    /// not keep it from running: every timing patch already in place comes off again, a
+    /// warning gives the reason, and the hooks run untimed under the call's heading, which
+    /// names their owners.
+    /// </remarks>
+    internal static CallAllHookTiming Install(
+        MethodBase target,
+        Func<Assembly, ModContentPack?> findMod
+    )
     {
         var timing = new CallAllHookTiming();
         _depth = 0;
-
-        var patches = Harmony.GetPatchInfo(target);
-        if (patches == null)
+        _warnedFromHook = false;
+        try
         {
-            return timing;
+            timing.PatchHooksOn(target, findMod);
         }
-
-        var handled = new HashSet<MethodBase>();
-        foreach (var patch in HooksIn(patches))
+        catch (Exception e)
         {
-            var method = patch.PatchMethod;
-            var assembly = method?.DeclaringType?.Assembly;
-            var mod = assembly == null ? null : Utilities.FindModByAssembly(assembly);
-            var handling = HandlingFor(assembly, method != null && !handled.Add(method), mod);
-            if (handling == HookHandling.NameAsUntimed)
-            {
-                timing.AddUntimed(mod?.Name ?? patch.owner);
-            }
-            else if (handling == HookHandling.Time && method != null && mod != null)
-            {
-                timing.TimeHook(method, mod);
-            }
+            timing.Remove();
+            timing.NameEveryHookOn(target, findMod);
+            LoadingProgressMod.Warning(
+                $"Could not time the hooks on {target.DeclaringType?.Name}.{target.Name}, so they run untimed: {e.Message}"
+            );
         }
-
-        if (timing._patched.Count > 0)
-        {
-            timing.RebuildReplacementOf(target);
-        }
-        timing._untimedOwners.Sort(StringComparer.Ordinal);
         return timing;
     }
 
@@ -91,8 +92,83 @@ internal sealed class CallAllHookTiming
             .Concat(patches.InnerPrefixes)
             .Concat(patches.InnerPostfixes);
 
+    private void PatchHooksOn(MethodBase target, Func<Assembly, ModContentPack?> findMod)
+    {
+        var patches = Harmony.GetPatchInfo(target);
+        if (patches == null)
+        {
+            return;
+        }
+
+        var handled = new HashSet<MethodBase>();
+        foreach (var patch in HooksIn(patches))
+        {
+            var method = patch.PatchMethod;
+            var assembly = method?.DeclaringType?.Assembly;
+            var mod = assembly == null ? null : findMod(assembly);
+            var handling = HandlingFor(assembly, method != null && !handled.Add(method), mod);
+            if (handling == HookHandling.NameAsUntimed)
+            {
+                AddUntimed(mod?.Name ?? patch.owner);
+            }
+            else if (handling == HookHandling.Time && method != null && mod != null)
+            {
+                TimeHook(method, mod);
+            }
+        }
+
+        if (_patched.Count > 0)
+        {
+            RebuildReplacementOf(target);
+        }
+        _untimedOwners.Sort(StringComparer.Ordinal);
+    }
+
+    // Names the owner of every hook on the target, for when none of them could be timed. Best
+    // effort: whatever made the install fail may fail again here, and the warning already
+    // logged says why.
+    private void NameEveryHookOn(MethodBase target, Func<Assembly, ModContentPack?> findMod)
+    {
+        _untimedOwners.Clear();
+        try
+        {
+            if (Harmony.GetPatchInfo(target) is { } patches)
+            {
+                foreach (var patch in HooksIn(patches))
+                {
+                    if (OwnerNameOf(patch, findMod) is { } name)
+                    {
+                        AddUntimed(name);
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Nothing more can be named; the hooks still run, under the plain heading.
+        }
+        _untimedOwners.Sort(StringComparer.Ordinal);
+    }
+
+    // A hook's owner as the heading names it: its mod's name, else its Harmony id; null for
+    // one of Loading Progress's own.
+    private static string? OwnerNameOf(Patch patch, Func<Assembly, ModContentPack?> findMod)
+    {
+        try
+        {
+            var assembly = patch.PatchMethod?.DeclaringType?.Assembly;
+            return assembly == typeof(CallAllHookTiming).Assembly
+                ? null
+                : (assembly == null ? null : findMod(assembly)?.Name) ?? patch.owner;
+        }
+        catch (Exception)
+        {
+            return patch.owner;
+        }
+    }
+
     /// <summary>
-    /// What <see cref="Install"/> does with one hook on the call.
+    /// What <see cref="Install(MethodBase)"/> does with one hook on the call.
     /// </summary>
     internal enum HookHandling
     {
@@ -161,24 +237,17 @@ internal sealed class CallAllHookTiming
     /// real initialization would stay on the base-game heading unnoticed. Patching a hook
     /// marks it as not to be inlined from then on, and one more patch on the target makes
     /// Harmony build the replacement afresh, so it calls the hook through its detour. The
-    /// patch does nothing itself and comes off with the rest.
+    /// patch does nothing itself and comes off with the rest. A rebuild that fails fails the
+    /// install, since any inlined hook would then run untimed and unnamed.
     /// </remarks>
     private void RebuildReplacementOf(MethodBase target)
     {
-        try
-        {
-            _ = _harmony.Patch(
-                target,
-                prefix: new HarmonyMethod(typeof(CallAllHookTiming), nameof(NoOpPrefix))
-            );
-            _rebuilt = target;
-        }
-        catch (Exception e)
-        {
-            LoadingProgressMod.Warning(
-                $"Could not rebuild {target.DeclaringType?.Name}.{target.Name} for hook timing: {e.Message}"
-            );
-        }
+        // Set first, so Remove takes the prefix off even after a patch that failed partway.
+        _rebuilt = target;
+        _ = _harmony.Patch(
+            target,
+            prefix: new HarmonyMethod(typeof(CallAllHookTiming), nameof(NoOpPrefix))
+        );
     }
 
     /// <summary>
@@ -239,21 +308,41 @@ internal sealed class CallAllHookTiming
 
         if (_depth++ == 0 && BaseCategory is { } paused)
         {
-            StartupImpactProfilerUtil.StopBaseGameProfiler(paused);
+            Quietly(() => StartupImpactProfilerUtil.StopBaseGameProfiler(paused));
         }
-        StartupImpactProfilerUtil.StartModProfiler(timed.Mod, timed.Category);
+        Quietly(() => StartupImpactProfilerUtil.StartModProfiler(timed.Mod, timed.Category));
     }
 
     private static Exception? Finalizer(Exception? __exception, MethodBase __originalMethod)
     {
         if (_timed.TryGetValue(__originalMethod, out var timed))
         {
-            StartupImpactProfilerUtil.StopModProfiler(timed.Mod, timed.Category);
+            Quietly(() => StartupImpactProfilerUtil.StopModProfiler(timed.Mod, timed.Category));
             if (--_depth == 0 && BaseCategory is { } paused)
             {
-                StartupImpactProfilerUtil.StartBaseGameProfiler(paused);
+                Quietly(() => StartupImpactProfilerUtil.StartBaseGameProfiler(paused));
             }
         }
         return __exception;
+    }
+
+    // The prefix and finalizer run inside other mods' hooks, so nothing in them may throw into
+    // one: a failure is logged once, and the hook and the call go on.
+    private static void Quietly(Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception e)
+        {
+            if (!_warnedFromHook)
+            {
+                _warnedFromHook = true;
+                LoadingProgressMod.Warning(
+                    $"Timing a hook on the static constructor pass failed, so some hook time may sit under the wrong heading: {e.Message}"
+                );
+            }
+        }
     }
 }

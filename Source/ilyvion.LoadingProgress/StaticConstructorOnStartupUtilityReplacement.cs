@@ -179,16 +179,45 @@ internal sealed class StaticConstructorOnStartupUtilityReplacement
     {
         var hookTiming = CallAllHookTiming.Install(CallAllMethod);
         var passCategory = CallAllPassCategoryFor(hookTiming.UntimedOwners);
-        CallAllHookTiming.BaseCategory = passCategory;
-        StartupImpactProfilerUtil.StartBaseGameProfiler(passCategory);
+        var timed = false;
         try
         {
+            // The call runs whatever its timing does, or no other mod's hook on it would fire.
+            try
+            {
+                CallAllHookTiming.BaseCategory = passCategory;
+                StartupImpactProfilerUtil.StartBaseGameProfiler(passCategory);
+                timed = true;
+            }
+            catch (Exception e)
+            {
+                LoadingProgressMod.Warning(
+                    $"Could not time the static constructor pass: {e.Message}"
+                );
+            }
             StaticConstructorOnStartupUtility.CallAll();
         }
         finally
         {
-            StartupImpactProfilerUtil.StopBaseGameProfiler(passCategory);
-            hookTiming.Remove();
+            // The patches come off whatever happens, or they would stay on other mods' hook
+            // methods for the rest of the session.
+            try
+            {
+                if (timed)
+                {
+                    StartupImpactProfilerUtil.StopBaseGameProfiler(passCategory);
+                }
+            }
+            catch (Exception e)
+            {
+                LoadingProgressMod.Warning(
+                    $"Could not time the static constructor pass: {e.Message}"
+                );
+            }
+            finally
+            {
+                hookTiming.Remove();
+            }
         }
     }
 

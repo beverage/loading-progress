@@ -14,8 +14,8 @@ internal sealed class LoadingTimeTests
     private const int MaxFramesToWaitForTheStartupToComplete = 1200;
 
     // A command-line test run starts before Root.Start's InitializingInterface event, and the
-    // loading window records its time later still, at the first frame the main menu sits idle
-    // (or when a quicktest goes straight into a game).
+    // loading window records its time later still, at the frame the main menu is usable (or
+    // when a quicktest goes straight into a game).
     private static bool StillStartingUp(ref int framesWaited) =>
         !LoadingProgressWindow.StartupComplete
         && framesWaited++ < MaxFramesToWaitForTheStartupToComplete;
@@ -38,7 +38,7 @@ internal sealed class LoadingTimeTests
     // Regression. Startup Impact used to stop before the final garbage collection, asset
     // unload and remaining ExecuteWhenFinished actions while the corner kept counting, and
     // the corner used to stop where the interface began initializing while the startup impact
-    // window went on to the main menu. Both now count to the first frame the menu sits idle.
+    // window went on to the main menu. Both now count to the frame the main menu is usable.
     [Test]
     public static IEnumerator StartupImpactAndTheCornerMeasureTheSameSpan()
     {

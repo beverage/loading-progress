@@ -1,26 +1,28 @@
 namespace ilyvion.LoadingProgress.StartupImpact;
 
 /// <summary>
-/// Follows the startup's tail: the long events that run once loading is over, up to the first
-/// frame the main menu sits idle. Keeps the loading window's activity line on the event that
-/// is running, ends the startup for the window when the menu is reached and, with tracking
-/// on, times each event under the mod whose code it runs.
+/// Follows the startup's tail: the long events that run once loading is over, up to the frame
+/// the main menu is usable (two idle frames within 250 ms of each other, or the fifth idle
+/// frame in a row). Keeps the loading window's activity line on the event that is running,
+/// ends the startup for the window when the menu is reached and, with tracking on, times
+/// each event under the mod whose code it runs.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Loading is over, and the tracking clock stops, where the interface begins initializing,
 /// the window's Finished stage. What runs after, the rest of the interface's initialization
-/// and the windows and setup other mods queue for after loading, is time the player waits
-/// through, and until now nothing measured it and the window had already left the screen.
-/// Each such event is timed from the frame it became the current one to the frame it stopped
-/// being it, and credited to the mod whose code it runs, under its own category, so it shows
-/// beside everything else that mod cost. The interface's own event is timed from the clock
-/// stop instead, since it finishes within the frame the clock stops in.
+/// and the windows and setup other mods queue for after loading, is time the player still
+/// waits through, with the loading window on screen. Each such event is timed from the frame
+/// it became the current one to the frame it stopped being it, and credited to the mod whose
+/// code it runs, under its own category, so it shows beside everything else that mod cost.
+/// The interface's own event is timed from the clock stop instead, since it finishes within
+/// the frame the clock stops in.
 /// </para>
 /// <para>
 /// Time the game spends paused is left out. The engine keeps running in the background only
 /// while it loads; on the first idle frame it applies the player's 'Run in background'
 /// preference, off by default, and from then on an unfocused game stops between frames. A
+/// pause runs from the end of the last frame to where the next frame's long events begin. A
 /// player who switched to another window during a long load would otherwise find the time
 /// away counted as loading time.
 /// </para>

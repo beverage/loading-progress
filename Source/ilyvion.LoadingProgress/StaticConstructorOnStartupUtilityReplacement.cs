@@ -130,8 +130,13 @@ internal sealed class StaticConstructorOnStartupUtilityReplacement
         yield return null;
 
         // The collect and the unload are the engine's; they get a heading of their own under
-        // the base game. The unload is asynchronous and blocks the next frame, so the category
-        // stays open across the yield that follows and takes that frame in.
+        // the base game. The unload is asynchronous and blocks a later frame. The yield that
+        // follows ends this frame once the frame's time budget for long events is spent, as it
+        // is after a long collect on a long mod list, or always when forced repaints are on,
+        // since the stage change above asks for one. The category then stays open into the
+        // frame the unload blocks and takes it in. After a short collect with forced repaints
+        // off, the frame goes on, the category closes first, and the unload's stall falls in
+        // the remaining time.
         DeepProfiler.Start("Garbage Collection");
         StartupImpactProfilerUtil.StartBaseGameProfiler(GarbageCollectionCategory);
         try

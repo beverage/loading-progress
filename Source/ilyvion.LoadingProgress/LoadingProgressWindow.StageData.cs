@@ -606,8 +606,8 @@ internal sealed partial class LoadingProgressWindow
             {
                 // Loading is over, but the startup is not: the interface's initialization and
                 // the long events other mods queue for after loading still run, with this
-                // window up and its clock going, until CompleteStartup at the first idle menu
-                // frame. The activity line shows each of those events from here on.
+                // window up and its clock going, until CompleteStartup at the frame the menu is
+                // usable. The activity line shows each of those events from here on.
                 CurrentStage = LoadingStage.Finished;
                 _currentLoadingActivity = string.Empty;
             },

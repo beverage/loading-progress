@@ -86,9 +86,9 @@ internal sealed class Settings : ModSettings
         set => _clearEstimatesOnModListChange = value;
     }
 
-    // Samples recorded by earlier versions ran to the interface starting to initialize; they
-    // now run to the first idle main-menu frame. Set once the history has been cleared of the
-    // shorter kind.
+    // Loading-time samples run to the frame the main menu is usable; those recorded by
+    // earlier versions ran only to the interface starting to initialize. Set once the
+    // history has been cleared of the shorter kind.
     private bool _loadingTimesMeasuredToMenu;
     public bool LoadingTimesMeasuredToMenu
     {

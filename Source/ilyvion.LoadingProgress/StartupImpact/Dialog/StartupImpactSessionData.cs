@@ -53,8 +53,8 @@ internal sealed class StartupImpactSessionData : IExposable
     public IReadOnlyList<StartupImpactStageData> StageTimings => stageTimings.AsReadOnly();
 
     /// <summary>
-    /// Milliseconds from the start of tracking to the first frame the main menu sat idle, or
-    /// 0 for a session that never recorded one: one saved before this was measured, or a
+    /// Milliseconds from the start of tracking to the frame the main menu was usable, or 0
+    /// for a session that never recorded one: one saved before this was measured, or a
     /// startup that went straight into a game.
     /// </summary>
     public float TimeToMenu => timeToMenu;

@@ -12,7 +12,9 @@ namespace ilyvion.LoadingProgress.StartupImpact;
 /// action's target says whose def it is: the def itself when the lambda captured only
 /// <c>this</c>, or a compiler-generated closure holding it, as when a def passes itself into
 /// a property's <c>PostLoadSpecial</c>. The same holds for a mod's own per-def actions: the
-/// def a framework sets up belongs to the mod that declared it.
+/// def a framework sets up belongs to the mod that declared it. The rule reads only the
+/// action's target, so a mod's single action whose lambda captures a local holding some def
+/// is credited to that def's mod as well, since nothing tells it apart from a per-def one.
 /// </remarks>
 internal static class DeferredActionOwner
 {

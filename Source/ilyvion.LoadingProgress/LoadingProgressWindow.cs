@@ -114,11 +114,11 @@ internal sealed partial class LoadingProgressWindow
     /// straight into a game.
     /// </summary>
     /// <remarks>
-    /// This used to happen as soon as the interface began initializing, so the long events
-    /// other mods run after that, and any stall on the menu's first frame, fell outside the
-    /// time shown and estimated, though the player waited through them with this window gone
-    /// and vanilla's status box reading "...". The startup impact window counts to the same
-    /// idle frame, so the two figures agree, and the corner shows the same time.
+    /// The long events other mods run after the interface begins initializing, and any stall
+    /// on the menu's first frame, are part of the player's wait, so the time shown and
+    /// estimated runs to here rather than to the end of loading. The startup impact window
+    /// counts to the same idle frame, so the two figures agree, and the corner shows the same
+    /// time.
     /// </remarks>
     internal static void CompleteStartup(float pausedMs)
     {

@@ -33,8 +33,8 @@ internal sealed class StartupImpact
     public bool LoadingTimeMeasured { get; private set; }
 
     /// <summary>
-    /// Milliseconds from the start of tracking to the first frame the main menu sat idle, or
-    /// 0 until that frame comes. Later than <see cref="TotalLoadingTime"/> by however long the
+    /// Milliseconds from the start of tracking to the frame the main menu was usable, or 0
+    /// until that frame comes. Later than <see cref="TotalLoadingTime"/> by however long the
     /// interface's initialization and other mods' post-load events took, less any time the
     /// game sat paused in the background in between.
     /// </summary>

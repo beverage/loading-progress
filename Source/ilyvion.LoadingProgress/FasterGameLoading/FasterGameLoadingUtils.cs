@@ -2,42 +2,26 @@ namespace ilyvion.LoadingProgress.FasterGameLoading;
 
 internal static class FasterGameLoadingUtils
 {
-    internal const string FasterGameLoadingPackageId = "taranchuk.fastergameloading";
-
     private static bool? _hasFasterGameLoading;
     public static bool HasFasterGameLoading
     {
         get
         {
-            _hasFasterGameLoading ??= ModsConfig.ActiveModsInLoadOrder.Any(mod =>
-                IsFasterGameLoadingPackageId(mod.PackageId)
-            );
+            _hasFasterGameLoading ??= ModsConfig.ActiveModsInLoadOrder.Any(IsFasterGameLoading);
             return _hasFasterGameLoading.Value;
         }
     }
 
     /// <summary>
-    /// Whether a package id, as the mod list reports it, names Faster Game Loading.
+    /// Whether <paramref name="mod"/> is Faster Game Loading. The id is compared without the
+    /// <c>_steam</c> postfix the game adds to a Workshop copy's id while a local copy with the
+    /// same id is installed.
     /// </summary>
-    /// <remarks>
-    /// The game appends <see cref="ModMetaData.SteamModPostfix"/> to a Workshop mod's id
-    /// whenever a local copy with the same id is installed, so the id is compared without it.
-    /// </remarks>
-    internal static bool IsFasterGameLoadingPackageId(string? packageId)
-    {
-        if (string.IsNullOrEmpty(packageId))
-        {
-            return false;
-        }
-
-        var id = packageId!;
-        if (id.EndsWith(ModMetaData.SteamModPostfix, StringComparison.OrdinalIgnoreCase))
-        {
-            id = id[..^ModMetaData.SteamModPostfix.Length];
-        }
-
-        return id.Equals(FasterGameLoadingPackageId, StringComparison.OrdinalIgnoreCase);
-    }
+    internal static bool IsFasterGameLoading(ModMetaData mod) =>
+        mod.PackageIdNonUnique.Equals(
+            "taranchuk.fastergameloading",
+            StringComparison.OrdinalIgnoreCase
+        );
 
     public static HashSet<ModContentPack>? LoadedMods
     {

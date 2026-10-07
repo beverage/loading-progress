@@ -30,6 +30,12 @@ namespace ilyvion.LoadingProgress.StartupImpact;
 /// </remarks>
 internal static class PostLoadTracker
 {
+    /// <summary>
+    /// What everything timed after loading is timed under, the events and Loading Progress's
+    /// own work alike: the remaining time's entry for after loading takes what is timed under
+    /// it back off. Something timed then under any other key would count in its owner's time
+    /// and again in that entry.
+    /// </summary>
     internal const string Category = "LoadingProgress.StartupImpact.PostLoadLongEvent";
 
     // Two idle frames closer together than this mean the menu is drawing freely; a wait

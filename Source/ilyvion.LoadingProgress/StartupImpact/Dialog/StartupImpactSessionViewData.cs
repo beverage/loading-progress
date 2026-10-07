@@ -24,9 +24,6 @@ internal sealed class StartupImpactSessionViewData
     // time lists both, so it is told apart there.
     private const string SecondPassKey = "LoadingProgress.StartupImpact.Remaining.SecondPass";
 
-    private const string PostLoadLongEventPrefix =
-        "LoadingProgress.StartupImpact.PostLoadLongEvent";
-
     // How many lines a breakdown in a tooltip lists, largest first; the rest are counted.
     internal const int BreakdownLines = 10;
 
@@ -439,14 +436,19 @@ internal sealed class StartupImpactSessionViewData
 
     /// <summary>
     /// Time between the end of loading and the main menu that some category did account for:
-    /// the long events timed after loading, whoever ran them.
+    /// everything timed under <see cref="PostLoadTracker.Category"/>, whoever ran it.
     /// </summary>
+    /// <remarks>
+    /// The stage ledger closes when loading ends, so it holds none of this time, and a saved
+    /// session has only its metrics to go by. These keep the time the game sat paused in the
+    /// background out, as the time to the menu does.
+    /// </remarks>
     private float PostLoadAttributedTime()
     {
         var total = 0f;
         foreach (var entry in sessionData.Metrics)
         {
-            if (entry.Key.StartsWith(PostLoadLongEventPrefix, StringComparison.Ordinal))
+            if (entry.Key.StartsWith(PostLoadTracker.Category, StringComparison.Ordinal))
             {
                 total += entry.Value;
             }
@@ -455,7 +457,7 @@ internal sealed class StartupImpactSessionViewData
         {
             foreach (var entry in mod.Metrics)
             {
-                if (entry.Key.StartsWith(PostLoadLongEventPrefix, StringComparison.Ordinal))
+                if (entry.Key.StartsWith(PostLoadTracker.Category, StringComparison.Ordinal))
                 {
                     total += entry.Value;
                 }

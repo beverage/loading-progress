@@ -17,7 +17,9 @@ namespace ilyvion.LoadingProgress.StartupImpact;
 /// code it runs, under its own category, so it shows beside everything else that mod cost.
 /// The engine's own events go under the base game, and one whose code no mod loaded is left
 /// untimed, as a deferred action from such code is. The interface's own event is timed from
-/// the clock stop instead, since it finishes within the frame the clock stops in.
+/// the clock stop instead, since it finishes within the frame the clock stops in. The
+/// deferred actions an event queues run when it finishes; each is timed under the mod it is
+/// credited to, the way deferred actions during loading are, with the event paused meanwhile.
 /// </para>
 /// <para>
 /// Time the game spends paused is left out. The engine keeps running in the background only
@@ -31,9 +33,10 @@ namespace ilyvion.LoadingProgress.StartupImpact;
 internal static class PostLoadTracker
 {
     /// <summary>
-    /// What everything timed after loading is timed under: the remaining time's entry for after
-    /// loading takes what is timed under it back off. Something timed then under any other key
-    /// would count in its owner's time and again in that entry.
+    /// What everything timed after loading is timed under, the long events and the deferred
+    /// actions alike: the remaining time's entry for after loading takes what is timed under it
+    /// back off. Something timed then under any other key would count in its owner's time and
+    /// again in that entry.
     /// </summary>
     internal const string Category = "LoadingProgress.StartupImpact.PostLoadLongEvent";
 
@@ -71,8 +74,7 @@ internal static class PostLoadTracker
 
         // Timing needs tracking; the window's tail runs with or without it.
         var startupImpact = LoadingProgressMod.instance?.StartupImpact;
-        var timing =
-            startupImpact is { WasTrackingEnabledAtStartup: true, LoadingTimeMeasured: true };
+        var timing = IsTimingTheTail;
         var finished = LoadingProgressWindow.CurrentStage == LoadingStage.Finished;
         if (!timing && !finished)
         {
@@ -177,6 +179,132 @@ internal static class PostLoadTracker
         if (!_done && _current == null && LongEventHandler.currentEvent is { } current)
         {
             StartCurrent(current);
+        }
+    }
+
+    /// <summary>
+    /// Whether the wait after loading is being timed: loading has finished with tracking on,
+    /// the startup has not ended, and the program is still at its entry state. The game's scene
+    /// leaves that state as it starts, and runs its interface's initialization inline, before
+    /// the tracker next looks and ends the startup.
+    /// </summary>
+    internal static bool IsTimingTheTail =>
+        !_done
+        && Current.ProgramState == ProgramState.Entry
+        && LoadingProgressMod.instance?.StartupImpact
+            is { WasTrackingEnabledAtStartup: true, LoadingTimeMeasured: true };
+
+    /// <summary>
+    /// Runs the deferred actions queued after loading as the engine does, each timed under the
+    /// mod it is credited to, under <see cref="Category"/>. The long event they run after is
+    /// paused meanwhile, so it keeps only its own time.
+    /// </summary>
+    /// <remarks>
+    /// Like the engine, it runs an action that another queues during the pass in the same pass,
+    /// and clears the queue at the end.
+    /// </remarks>
+    internal static void RunDeferredActions()
+    {
+        if (LongEventHandler.executingToExecuteWhenFinished)
+        {
+            Log.Warning("Already executing.");
+            return;
+        }
+
+        LongEventHandler.executingToExecuteWhenFinished = true;
+        try
+        {
+            RunDeferredActions(LongEventHandler.toExecuteWhenFinished);
+        }
+        finally
+        {
+            LongEventHandler.executingToExecuteWhenFinished = false;
+        }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="actions"/>, including any queued onto it while they run, each timed
+    /// under the mod it is credited to, under <see cref="Category"/>, with the current long
+    /// event paused meanwhile, then clears it.
+    /// </summary>
+    /// <remarks>
+    /// A failure in the timing, whether pausing the event, naming an action or going on with
+    /// the event afterwards, is logged and leaves that part untimed. Every action still runs,
+    /// as it would without the timing.
+    /// </remarks>
+    internal static void RunDeferredActions(List<Action> actions)
+    {
+        if (actions.Count == 0)
+        {
+            return;
+        }
+
+        TimeOnThisThread();
+        var resume = _current;
+        try
+        {
+            StopCurrent(0f);
+        }
+        catch (Exception e)
+        {
+            LoadingProgressMod.Warning(
+                $"Could not pause timing the current event for its deferred actions: {e.Message}"
+            );
+        }
+
+        DeepProfiler.Start("ExecuteToExecuteWhenFinished()");
+        try
+        {
+            for (var i = 0; i < actions.Count; i++)
+            {
+                var action = actions[i];
+                var label = LongEventHandler_ExecuteToExecuteWhenFinished_Patches.ProfilerLabel(
+                    action
+                );
+                LongEventHandler_ExecuteToExecuteWhenFinished_Patches.RunLabelledDeferredAction(
+                    action,
+                    label,
+                    CategoryLabel(action, label),
+                    timed: true,
+                    Category
+                );
+            }
+        }
+        finally
+        {
+            DeepProfiler.End();
+            actions.Clear();
+            if (resume != null)
+            {
+                try
+                {
+                    StartCurrent(resume);
+                }
+                catch (Exception e)
+                {
+                    ForgetCurrent();
+                    LoadingProgressMod.Warning(
+                        $"Could not go on timing the current event after its deferred actions, so the rest of it is untimed: {e.Message}"
+                    );
+                }
+            }
+        }
+    }
+
+    // What an action after loading is timed as: its code, named the way it was written, or
+    // the engine's label for it when naming it fails.
+    private static string CategoryLabel(Action action, string profilerLabel)
+    {
+        try
+        {
+            return DescribeCode(action.Method.DeclaringType, action.Method.Name);
+        }
+        catch (Exception e)
+        {
+            LoadingProgressMod.Warning(
+                $"Could not name the deferred action {profilerLabel}: {e.Message}"
+            );
+            return profilerLabel;
         }
     }
 
@@ -321,7 +449,11 @@ internal static class PostLoadTracker
     private static void TimeOnThisThread() =>
         LoadingProgressMod.instance.StartupImpact.UpdateActiveThreadId();
 
-    private static void StartCurrent(LongEventHandler.QueuedLongEvent queuedEvent)
+    /// <summary>
+    /// Starts timing <paramref name="queuedEvent"/> as the current event, under the mod whose
+    /// code it runs.
+    /// </summary>
+    internal static void StartCurrent(LongEventHandler.QueuedLongEvent queuedEvent)
     {
         _current = queuedEvent;
         _currentCategory = $"{Category}|{Describe(queuedEvent)}";
@@ -340,21 +472,24 @@ internal static class PostLoadTracker
         StartupImpactProfilerUtil.Start(owner, isBaseGame, category);
     }
 
-    // Stops timing the current event, taking discountMs, time the game sat paused, back off.
-    private static void StopCurrent(float discountMs)
+    /// <summary>
+    /// Stops timing the current event, taking <paramref name="discountMs"/>, time the game sat
+    /// paused, back off. The event is no longer the current one even when stopping throws.
+    /// </summary>
+    internal static void StopCurrent(float discountMs)
     {
         if (_current == null || _currentCategory == null)
         {
             return;
         }
 
-        StartupImpactProfilerUtil.Stop(
-            _currentOwner,
-            _currentIsBaseGame,
-            _currentCategory,
-            discountMs
-        );
+        var (owner, isBaseGame, category) = (_currentOwner, _currentIsBaseGame, _currentCategory);
+        ForgetCurrent();
+        StartupImpactProfilerUtil.Stop(owner, isBaseGame, category, discountMs);
+    }
 
+    private static void ForgetCurrent()
+    {
         _current = null;
         _currentOwner = null;
         _currentIsBaseGame = false;

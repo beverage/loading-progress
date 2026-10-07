@@ -401,8 +401,8 @@ internal sealed class StartupImpactSessionViewData
     /// <summary>
     /// The remaining entries a session's stages and its time to the menu give, largest first:
     /// each stage's wall time less what categories accounted for in it, and what came after
-    /// loading finished less the long events timed there. Anything under a millisecond is
-    /// left out.
+    /// loading finished less what was timed there, the long events and the deferred actions
+    /// they queued. Anything under a millisecond is left out.
     /// </summary>
     internal static IReadOnlyList<RemainingEntry> RemainingEntries(
         IEnumerable<StartupImpactStageData> stages,

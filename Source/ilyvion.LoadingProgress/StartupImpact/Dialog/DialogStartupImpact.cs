@@ -930,7 +930,9 @@ internal sealed class DialogStartupImpact : Window
     /// <summary>
     /// A section's heading line: a reveal or collapse button, the title and a short detail
     /// in grey. The whole line toggles the section, with the sound vanilla's tree lists make,
-    /// and hovering it shows the breakdown while the section is closed. Returns whether the
+    /// and hovering it shows the breakdown while the section is closed. Whether the section is
+    /// open is read with <paramref name="isOpen"/> and kept in the settings with
+    /// <paramref name="setOpen"/>, which are written when it changes. Returns whether the
     /// section is open after this frame.
     /// </summary>
     private static bool DrawSectionHeading(
@@ -939,9 +941,12 @@ internal sealed class DialogStartupImpact : Window
         string title,
         string? detail,
         string? breakdown,
-        bool open
+        Func<Settings, bool> isOpen,
+        Action<Settings, bool> setOpen
     )
     {
+        var settings = LoadingProgressMod.Settings;
+        var open = isOpen(settings);
         Rect lineRect = new(0, y, width, TitleHeight);
         Widgets.DrawHighlightIfMouseover(lineRect);
         Rect buttonRect = new(
@@ -979,6 +984,8 @@ internal sealed class DialogStartupImpact : Window
             return open;
         }
         (open ? SoundDefOf.TabClose : SoundDefOf.TabOpen).PlayOneShotOnCamera();
+        setOpen(settings, !open);
+        settings.Write();
         return !open;
     }
 
@@ -1001,20 +1008,15 @@ internal sealed class DialogStartupImpact : Window
                 .Translate(ProfilerBar.TimeText(_sessionViewData.OffThreadBasegameLoadingTime))
                 .ToString()
             : _sessionViewData.LargestBaseGameStepText;
-        var settings = LoadingProgressMod.Settings;
         var open = DrawSectionHeading(
             y,
             width,
             title,
             detail,
             _sessionViewData.BaseGameBreakdownText,
-            settings.ExpandBaseGameSection
+            static settings => settings.ExpandBaseGameSection,
+            static (settings, value) => settings.ExpandBaseGameSection = value
         );
-        if (open != settings.ExpandBaseGameSection)
-        {
-            settings.ExpandBaseGameSection = open;
-            settings.Write();
-        }
         y += TitleHeight;
         if (!open)
         {
@@ -1075,20 +1077,15 @@ internal sealed class DialogStartupImpact : Window
         var title = "LoadingProgress.StartupImpact.StartupRemaining".Translate(
             ProfilerBar.TimeText(_sessionViewData.RemainingLoadingTime)
         );
-        var settings = LoadingProgressMod.Settings;
         var open = DrawSectionHeading(
             y,
             width,
             title,
             _sessionViewData.LargestRemainingEntryText,
             _sessionViewData.RemainingBreakdownText,
-            settings.ExpandRemainingSection
+            static settings => settings.ExpandRemainingSection,
+            static (settings, value) => settings.ExpandRemainingSection = value
         );
-        if (open != settings.ExpandRemainingSection)
-        {
-            settings.ExpandRemainingSection = open;
-            settings.Write();
-        }
         y += TitleHeight;
         if (!open)
         {

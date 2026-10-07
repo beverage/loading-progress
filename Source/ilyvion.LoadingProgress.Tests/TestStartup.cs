@@ -1,7 +1,10 @@
+using ilyvion.LoadingProgress.StartupImpact;
+
 namespace ilyvion.LoadingProgress.Tests;
 
 /// <summary>
-/// Lets a test that records time into the live session wait until the startup's tail is over.
+/// Lets a test that records time into the live session wait until the startup's tail is over,
+/// and take that time back out afterwards.
 /// </summary>
 /// <remarks>
 /// A command-line test run starts before the startup is over: before the tracking clock
@@ -25,6 +28,27 @@ internal static class TestStartup
     /// first test that waits. None of it is that test's failure.
     /// </remarks>
     internal const string OtherModsWarnings = @"^(?!\[Loading Progress\])";
+
+    /// <summary>
+    /// Why a test that needs this startup tracked skips when it was not.
+    /// </summary>
+    internal const string TrackingOff = "Startup impact tracking is off.";
+
+    /// <summary>
+    /// Takes a test's category back out of the live session: its time on the active thread,
+    /// with the total it went into, and its entry for other threads. A test that records time
+    /// waits for the startup to end first, so the stage ledger, closed by then, holds none of
+    /// it.
+    /// </summary>
+    internal static void Forget(Profiler profiler, string category)
+    {
+        if (profiler.Metrics.TryGetValue(category, out var ms))
+        {
+            profiler.Discount(category, ms);
+            _ = profiler.Metrics.TryRemove(category, out _);
+        }
+        _ = profiler.OffThreadMetrics.TryRemove(category, out _);
+    }
 
     /// <summary>
     /// Whether to wait another frame: the tail is not over and the wait has not run out. Use

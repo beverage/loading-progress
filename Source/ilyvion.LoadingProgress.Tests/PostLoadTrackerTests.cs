@@ -9,8 +9,6 @@ namespace ilyvion.LoadingProgress.Tests;
 [WarningsAllowed(TestStartup.OtherModsWarnings)]
 internal sealed class PostLoadTrackerTests
 {
-    private const string TrackingOff = "Startup impact tracking is off.";
-
     [Test]
     public static void TheFirstIdleFrameNeverSettlesTheMenu() =>
         Expect.IsFalse(PostLoadTracker.IsMenuSettled(-1f, 100000f, 1));
@@ -138,7 +136,7 @@ internal sealed class PostLoadTrackerTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -167,7 +165,7 @@ internal sealed class PostLoadTrackerTests
         finally
         {
             startupImpact.UpdateActiveThreadId();
-            Forget(profiler, category);
+            TestStartup.Forget(profiler, category);
         }
     }
 
@@ -177,7 +175,7 @@ internal sealed class PostLoadTrackerTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -208,7 +206,7 @@ internal sealed class PostLoadTrackerTests
         finally
         {
             startupImpact.UpdateActiveThreadId();
-            Forget(profiler, category);
+            TestStartup.Forget(profiler, category);
         }
     }
 
@@ -219,7 +217,7 @@ internal sealed class PostLoadTrackerTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -241,20 +239,8 @@ internal sealed class PostLoadTrackerTests
         }
         finally
         {
-            Forget(profiler, category);
+            TestStartup.Forget(profiler, category);
         }
-    }
-
-    // Takes a test's category back out of the live session, totals included. The test waited
-    // for the startup to complete, so the stage ledger, closed by then, holds none of it.
-    private static void Forget(Profiler profiler, string category)
-    {
-        if (profiler.Metrics.TryGetValue(category, out var ms))
-        {
-            profiler.Discount(category, ms);
-            _ = profiler.Metrics.TryRemove(category, out _);
-        }
-        _ = profiler.OffThreadMetrics.TryRemove(category, out _);
     }
 
     [Test]

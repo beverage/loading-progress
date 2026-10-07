@@ -13,7 +13,6 @@ internal sealed class CallAllHookTimingTests
     private const string TestBaseCategory = "LoadingProgress.Tests.CallAllHookTiming.Call";
     private const string HookCategoryPrefix =
         $"{CallAllHookTiming.Category}|{nameof(CallAllHookTimingTests)}.";
-    private const string TrackingOff = "Startup impact tracking is off.";
 
     // The method under test, with a body for Harmony to patch. Not inlined, so the call from
     // the helper below still reaches the patched method.
@@ -51,7 +50,7 @@ internal sealed class CallAllHookTimingTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -72,7 +71,7 @@ internal sealed class CallAllHookTimingTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -92,7 +91,7 @@ internal sealed class CallAllHookTimingTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -129,7 +128,7 @@ internal sealed class CallAllHookTimingTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -387,7 +386,7 @@ internal sealed class CallAllHookTimingTests
     // session is saved when the menu is reached, and a test run starts before that.
     private static void ForgetTestTime()
     {
-        Forget(BaseGame, TestBaseCategory);
+        TestStartup.Forget(BaseGame, TestBaseCategory);
         if (OwnModInfo() is not { } info)
         {
             return;
@@ -400,16 +399,7 @@ internal sealed class CallAllHookTimingTests
                 .ToList()
         )
         {
-            Forget(info.Profiler, category);
-        }
-    }
-
-    private static void Forget(Profiler profiler, string category)
-    {
-        if (profiler.Metrics.TryGetValue(category, out var ms))
-        {
-            profiler.Discount(category, ms);
-            _ = profiler.Metrics.TryRemove(category, out _);
+            TestStartup.Forget(info.Profiler, category);
         }
     }
 }

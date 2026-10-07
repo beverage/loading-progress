@@ -9,6 +9,7 @@ namespace ilyvion.LoadingProgress.Tests;
 internal sealed class StartupImpactEndOfLoadingTests
 {
     private const int MaxFramesToWaitForTheClock = 1200;
+    private const string TestCategory = "LoadingProgress.Tests.StartupImpactEndOfLoadingTests";
 
     [Test]
     public static IEnumerator TheEndOfLoadingIsRecordedUnderItsOwners()
@@ -63,6 +64,85 @@ internal sealed class StartupImpactEndOfLoadingTests
             )
         );
         Expect.GreaterThan(constructor, 0f);
+    }
+
+    // The collect's heading used to open outside any try and close only after the yield that
+    // follows it, so a collect that threw left it open on the base game's timer, and every
+    // later base-game step ran inside it.
+    [Test]
+    [WarningsAllowed(TestStartup.OtherModsWarnings)]
+    public static IEnumerator AStepThatThrowsHasItsCategoryClosed()
+    {
+        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        {
+            Test.Skip(TestStartup.TrackingOff);
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
+        }
+
+        const string category = TestCategory + ".Throwing";
+        var startupImpact = LoadingProgressMod.instance.StartupImpact;
+        startupImpact.UpdateActiveThreadId();
+        try
+        {
+            var steps = StaticConstructorOnStartupUtilityReplacement.TimedIntoTheNextFrame(
+                category,
+                category,
+                static () => throw new InvalidOperationException("A step that fails, for the test.")
+            );
+
+            _ = Expect.Throws<InvalidOperationException>(() =>
+            {
+                foreach (var _ in steps) { }
+            });
+            Expect.IsTrue(startupImpact.BaseGameProfiler.Metrics.ContainsKey(category));
+        }
+        finally
+        {
+            TestStartup.Forget(startupImpact.BaseGameProfiler, category);
+        }
+    }
+
+    // The engine disposes a long event's iterator when the event ends, early on an exception;
+    // a step stopped at its yield closes its heading then too.
+    [Test]
+    [WarningsAllowed(TestStartup.OtherModsWarnings)]
+    public static IEnumerator AStepDisposedAtItsYieldHasItsCategoryClosed()
+    {
+        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        {
+            Test.Skip(TestStartup.TrackingOff);
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
+        }
+
+        const string category = TestCategory + ".Disposed";
+        var startupImpact = LoadingProgressMod.instance.StartupImpact;
+        startupImpact.UpdateActiveThreadId();
+        try
+        {
+            var steps = StaticConstructorOnStartupUtilityReplacement
+                .TimedIntoTheNextFrame(category, category, static () => { })
+                .GetEnumerator();
+
+            Expect.IsTrue(steps.MoveNext());
+            ((IDisposable)steps).Dispose();
+            Expect.IsTrue(startupImpact.BaseGameProfiler.Metrics.ContainsKey(category));
+        }
+        finally
+        {
+            TestStartup.Forget(startupImpact.BaseGameProfiler, category);
+        }
     }
 
     // The patches that time the hooks come off with the call, whether tracking was on or not.

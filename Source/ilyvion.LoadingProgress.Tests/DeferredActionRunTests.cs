@@ -11,7 +11,6 @@ internal sealed class DeferredActionRunTests
     private const string Label = "ilyvion.LoadingProgress.Tests.DeferredActionRunTests -> Test";
     private const string Category =
         $"{LongEventHandler_ExecuteToExecuteWhenFinished_Patches.DeferredActionCategory}|{Label}";
-    private const string TrackingOff = "Startup impact tracking is off.";
 
     // An action that threw used to leave its category open on its owner's timer: the time it
     // had run was never recorded, and every category started there afterwards ran inside it
@@ -22,7 +21,7 @@ internal sealed class DeferredActionRunTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -56,7 +55,7 @@ internal sealed class DeferredActionRunTests
             {
                 StartupImpactProfilerUtil.StopModProfiler(mod, Category);
             }
-            Forget(info.Profiler, Category);
+            TestStartup.Forget(info.Profiler, Category);
         }
     }
 
@@ -65,7 +64,7 @@ internal sealed class DeferredActionRunTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -91,7 +90,7 @@ internal sealed class DeferredActionRunTests
         }
         finally
         {
-            Forget(info!.Profiler, Category);
+            TestStartup.Forget(info!.Profiler, Category);
         }
     }
 
@@ -103,7 +102,7 @@ internal sealed class DeferredActionRunTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             return;
         }
 
@@ -130,7 +129,7 @@ internal sealed class DeferredActionRunTests
         }
         finally
         {
-            Forget(info!.Profiler, Category);
+            TestStartup.Forget(info!.Profiler, Category);
         }
     }
 
@@ -157,16 +156,4 @@ internal sealed class DeferredActionRunTests
         OwnMod() is { } mod
             ? LoadingProgressMod.instance.StartupImpact.Modlist.GetModInfoFor(mod)
             : null;
-
-    // Takes the test's category back out of the live session, totals included. The timed
-    // tests wait for the startup to complete, so the stage ledger, closed by then, holds none
-    // of it.
-    private static void Forget(Profiler profiler, string category)
-    {
-        if (profiler.Metrics.TryGetValue(category, out var ms))
-        {
-            profiler.Discount(category, ms);
-            _ = profiler.Metrics.TryRemove(category, out _);
-        }
-    }
 }

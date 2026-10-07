@@ -137,20 +137,52 @@ internal sealed class StaticConstructorOnStartupUtilityReplacement
         // frame the unload blocks and takes it in. After a short collect with forced repaints
         // off, the frame goes on, the category closes first, and the unload's stall falls in
         // the remaining time.
-        DeepProfiler.Start("Garbage Collection");
-        StartupImpactProfilerUtil.StartBaseGameProfiler(GarbageCollectionCategory);
+        foreach (
+            var step in TimedIntoTheNextFrame(
+                GarbageCollectionCategory,
+                "Garbage Collection",
+                CollectGarbage
+            )
+        )
+        {
+            yield return step;
+        }
+    }
+
+    private static void CollectGarbage()
+    {
+        RimWorld.IO.AbstractFilesystem.ClearAllCache();
+        GC.Collect(int.MaxValue, GCCollectionMode.Forced);
+        _ = Resources.UnloadUnusedAssets();
+    }
+
+    /// <summary>
+    /// Runs <paramref name="work"/> under the base game's <paramref name="category"/>, inside the
+    /// engine profiler's <paramref name="label"/>, and yields once before the category stops,
+    /// so it also takes in a frame the work blocks. The category stops however the iterator
+    /// ends: after the yield, when the work throws, or when the iterator is disposed before it
+    /// finishes.
+    /// </summary>
+    internal static IEnumerable TimedIntoTheNextFrame(string category, string label, Action work)
+    {
+        StartupImpactProfilerUtil.StartBaseGameProfiler(category);
         try
         {
-            RimWorld.IO.AbstractFilesystem.ClearAllCache();
-            GC.Collect(int.MaxValue, GCCollectionMode.Forced);
-            _ = Resources.UnloadUnusedAssets();
+            DeepProfiler.Start(label);
+            try
+            {
+                work();
+            }
+            finally
+            {
+                DeepProfiler.End();
+            }
+            yield return null;
         }
         finally
         {
-            DeepProfiler.End();
+            StartupImpactProfilerUtil.StopBaseGameProfiler(category);
         }
-        yield return null;
-        StartupImpactProfilerUtil.StopBaseGameProfiler(GarbageCollectionCategory);
     }
 
     internal const string GarbageCollectionCategory =

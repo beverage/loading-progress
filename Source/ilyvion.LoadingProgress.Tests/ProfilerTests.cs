@@ -10,7 +10,6 @@ namespace ilyvion.LoadingProgress.Tests;
 [WarningsAllowed(TestStartup.OtherModsWarnings)]
 internal sealed class ProfilerTests
 {
-    private const string TrackingOff = "Startup impact tracking is off.";
     private const string TestHarmonyId = "ilyvion.LoadingProgress.Tests.ProfilerTests";
     private const string ConstructorCategory = "LoadingProgress.StartupImpact.ModConstructor";
     private const string NextCategory = "LoadingProgress.Tests.ProfilerTests.Next";
@@ -65,7 +64,7 @@ internal sealed class ProfilerTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -100,7 +99,7 @@ internal sealed class ProfilerTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -144,7 +143,7 @@ internal sealed class ProfilerTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 
@@ -177,7 +176,7 @@ internal sealed class ProfilerTests
     {
         if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
         {
-            Test.Skip(TrackingOff);
+            Test.Skip(TestStartup.TrackingOff);
             yield break;
         }
 

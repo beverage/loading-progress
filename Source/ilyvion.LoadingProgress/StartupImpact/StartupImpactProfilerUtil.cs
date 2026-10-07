@@ -4,9 +4,8 @@ internal static class StartupImpactProfilerUtil
 {
     /// <summary>
     /// The mod a deferred initialization action is credited to: the mod whose def it sets up
-    /// when it can be traced to one, else the mod whose assembly it runs from. Null with
-    /// <paramref name="isBaseGame"/> true for the engine's own actions that trace to no def;
-    /// null with it false for an action from an assembly no mod owns.
+    /// when it can be traced to one, else the owner of the code it runs, by
+    /// <see cref="OwnerOfCode"/>.
     /// </summary>
     /// <remarks>
     /// The engine queues one such action per def for graphics and references, every one from
@@ -15,15 +14,68 @@ internal static class StartupImpactProfilerUtil
     /// </remarks>
     public static ModContentPack? OwnerOfDeferredAction(Delegate action, out bool isBaseGame)
     {
-        var assembly = action.Method.DeclaringType?.Assembly;
-        var owner =
-            DeferredActionOwner.OwningContentPack(action)
-            ?? (assembly == null ? null : Utilities.FindModByAssembly(assembly));
+        if (DeferredActionOwner.OwningContentPack(action) is { } defOwner)
+        {
+            isBaseGame = false;
+            return defOwner;
+        }
+
+        return OwnerOfCode(action.Method.DeclaringType?.Assembly, out isBaseGame);
+    }
+
+    /// <summary>
+    /// The mod that loaded <paramref name="assembly"/>. Null with <paramref name="isBaseGame"/>
+    /// true for the engine's own assembly, and null with it false for an assembly no mod
+    /// loaded, such as the runtime's or a library's, whose code is credited to no one and left
+    /// untimed.
+    /// </summary>
+    public static ModContentPack? OwnerOfCode(Assembly? assembly, out bool isBaseGame)
+    {
+        var owner = assembly == null ? null : Utilities.FindModByAssembly(assembly);
         isBaseGame =
             owner == null
             && assembly != null
             && assembly.FullName.StartsWith("Assembly-CSharp", StringComparison.Ordinal);
         return owner;
+    }
+
+    /// <summary>
+    /// Starts <paramref name="category"/> on the timer of an owner <see cref="OwnerOfCode"/>
+    /// names: the mod's, else the base game's when <paramref name="isBaseGame"/>. Code no mod
+    /// owns is left untimed.
+    /// </summary>
+    public static void Start(ModContentPack? owner, bool isBaseGame, string category) =>
+        ProfilerFor(owner, isBaseGame)?.Start(category);
+
+    /// <summary>
+    /// Stops <paramref name="category"/> on the timer <see cref="Start"/> uses for the same
+    /// owner, and takes <paramref name="discountMs"/> back off it: time it was open that was
+    /// not the startup's, such as the game sitting paused in the background.
+    /// </summary>
+    public static void Stop(
+        ModContentPack? owner,
+        bool isBaseGame,
+        string category,
+        float discountMs = 0f
+    )
+    {
+        if (ProfilerFor(owner, isBaseGame) is { } profiler)
+        {
+            _ = profiler.Stop(category);
+            profiler.Discount(category, discountMs);
+        }
+    }
+
+    /// <summary>
+    /// The timer <see cref="Start"/> and <see cref="Stop"/> use for an owner: the mod's, else
+    /// the base game's when <paramref name="isBaseGame"/>, else none.
+    /// </summary>
+    internal static Profiler? ProfilerFor(ModContentPack? owner, bool isBaseGame)
+    {
+        var startupImpact = LoadingProgressMod.instance.StartupImpact;
+        return owner != null ? startupImpact.Modlist.GetModInfoFor(owner)?.Profiler
+            : isBaseGame ? startupImpact.BaseGameProfiler
+            : null;
     }
 
     public static void StartModProfiler(ModContentPack? mod, string key)

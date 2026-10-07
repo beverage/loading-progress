@@ -102,6 +102,25 @@ internal sealed class DeferredActionOwnerTests
         Expect.IsFalse(isBaseGame);
     }
 
+    // Start and Stop time deferred actions and post-load events on the timer this picks for
+    // their owner. Code no mod owns gets none, and is left untimed.
+    [Test]
+    public static void AnOwnersCodeIsTimedOnItsProfiler()
+    {
+        var startupImpact = LoadingProgressMod.instance.StartupImpact;
+        Expect.IsNotNull(TestsPack);
+
+        Expect.ReferencesAreEqual(
+            startupImpact.Modlist.GetModInfoFor(TestsPack)?.Profiler,
+            StartupImpactProfilerUtil.ProfilerFor(TestsPack, isBaseGame: false)
+        );
+        Expect.ReferencesAreEqual(
+            startupImpact.BaseGameProfiler,
+            StartupImpactProfilerUtil.ProfilerFor(null, isBaseGame: true)
+        );
+        Expect.IsNull(StartupImpactProfilerUtil.ProfilerFor(null, isBaseGame: false));
+    }
+
     [Test]
     public static void AnActionWithNoTargetHasNoOwnerHere()
     {

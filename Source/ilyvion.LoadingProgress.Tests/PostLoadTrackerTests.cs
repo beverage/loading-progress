@@ -1,3 +1,4 @@
+using System.Text;
 using DevTools.Testing;
 using ilyvion.LoadingProgress.StartupImpact;
 
@@ -157,7 +158,7 @@ internal sealed class PostLoadTrackerTests
         {
             Expect.IsFalse(startupImpact.IsActiveThread());
 
-            PostLoadTracker.StartTiming(null, category);
+            PostLoadTracker.StartTiming(null, isBaseGame: true, category);
             StartupImpactProfilerUtil.StopBaseGameProfiler(category);
 
             Expect.IsTrue(startupImpact.IsActiveThread());
@@ -207,6 +208,39 @@ internal sealed class PostLoadTrackerTests
         finally
         {
             startupImpact.UpdateActiveThreadId();
+            Forget(profiler, category);
+        }
+    }
+
+    // An event that was current through a pause is stopped with the pause taken back off, on
+    // the timer it was started on. A pause longer than the event leaves it nothing.
+    [Test]
+    public static IEnumerator APauseIsTakenOffTheTimerTheEventRanOn()
+    {
+        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        {
+            Test.Skip(TrackingOff);
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
+        }
+
+        var category = $"{PostLoadTracker.Category}|{nameof(PostLoadTrackerTests)}.Paused";
+        var profiler = LoadingProgressMod.instance.StartupImpact.BaseGameProfiler;
+        try
+        {
+            PostLoadTracker.StartTiming(null, isBaseGame: true, category);
+            StartupImpactProfilerUtil.Stop(null, isBaseGame: true, category, discountMs: 60000f);
+
+            Expect.IsTrue(profiler.Metrics.TryGetValue(category, out var ms));
+            Expect.AreApproximatelyEqual(0f, ms);
+        }
+        finally
+        {
             Forget(profiler, category);
         }
     }
@@ -262,19 +296,47 @@ internal sealed class PostLoadTrackerTests
     {
         Action action = static () => { };
 
-        Expect.IsNotNull(PostLoadTracker.OwnerOf(action, null));
+        var owner = PostLoadTracker.OwnerOf(action, null, out var isBaseGame);
+
+        Expect.IsNotNull(owner);
         Expect.ReferencesAreEqual(
             Utilities.FindModByAssembly(typeof(PostLoadTrackerTests).Assembly),
-            PostLoadTracker.OwnerOf(action, null)
+            owner
         );
+        Expect.IsFalse(isBaseGame);
     }
 
     [Test]
-    public static void TheEnginesOwnEventHasNoModOwner()
+    public static void TheEnginesOwnEventBelongsToTheBaseGame()
     {
         Action action = LongEventHandler.ClearQueuedEvents;
 
-        Expect.IsNull(PostLoadTracker.OwnerOf(action, null));
+        var owner = PostLoadTracker.OwnerOf(action, null, out var isBaseGame);
+
+        Expect.IsNull(owner);
+        Expect.IsTrue(isBaseGame);
+    }
+
+    // An event from code no mod loaded used to go under the base game, while a deferred
+    // action from the same code went untimed. Both now follow the deferred actions' rule.
+    [Test]
+    public static void AnEventFromCodeNoModLoadedBelongsToNeither()
+    {
+        var holder = new StringBuilder();
+        Func<string> action = holder.ToString;
+        IEnumerator enumerator = new List<int>().GetEnumerator();
+
+        var actionOwner = PostLoadTracker.OwnerOf(action, null, out var actionIsBaseGame);
+        var enumeratorOwner = PostLoadTracker.OwnerOf(
+            null,
+            enumerator,
+            out var enumeratorIsBaseGame
+        );
+
+        Expect.IsNull(actionOwner);
+        Expect.IsFalse(actionIsBaseGame);
+        Expect.IsNull(enumeratorOwner);
+        Expect.IsFalse(enumeratorIsBaseGame);
     }
 
     private static IEnumerator Steps()

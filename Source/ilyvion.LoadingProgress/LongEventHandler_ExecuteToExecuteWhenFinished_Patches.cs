@@ -399,7 +399,7 @@ internal static partial class LongEventHandler_ExecuteToExecuteWhenFinished_Patc
             {
                 (owner, isBaseGame) = findOwner(action);
                 category = $"{DeferredActionCategory}|{label}";
-                StartTiming(owner, isBaseGame, category);
+                StartupImpactProfilerUtil.Start(owner, isBaseGame, category);
             }
             catch (Exception ex)
             {
@@ -430,31 +430,12 @@ internal static partial class LongEventHandler_ExecuteToExecuteWhenFinished_Patc
     private static (ModContentPack? Owner, bool IsBaseGame) OwnerOf(Delegate action) =>
         (StartupImpactProfilerUtil.OwnerOfDeferredAction(action, out var isBaseGame), isBaseGame);
 
-    private static void StartTiming(ModContentPack? owner, bool isBaseGame, string category)
-    {
-        if (isBaseGame)
-        {
-            StartupImpactProfilerUtil.StartBaseGameProfiler(category);
-        }
-        else
-        {
-            StartupImpactProfilerUtil.StartModProfiler(owner, category);
-        }
-    }
-
     // Never throws into the queue: a failure to stop is logged, and the next action runs.
     private static void StopTiming(ModContentPack? owner, bool isBaseGame, string category)
     {
         try
         {
-            if (isBaseGame)
-            {
-                StartupImpactProfilerUtil.StopBaseGameProfiler(category);
-            }
-            else
-            {
-                StartupImpactProfilerUtil.StopModProfiler(owner, category);
-            }
+            StartupImpactProfilerUtil.Stop(owner, isBaseGame, category);
         }
         catch (Exception ex)
         {

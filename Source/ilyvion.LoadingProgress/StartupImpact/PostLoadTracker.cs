@@ -15,8 +15,9 @@ namespace ilyvion.LoadingProgress.StartupImpact;
 /// waits through, with the loading window on screen. Each such event is timed from the frame
 /// it became the current one to the frame it stopped being it, and credited to the mod whose
 /// code it runs, under its own category, so it shows beside everything else that mod cost.
-/// The interface's own event is timed from the clock stop instead, since it finishes within
-/// the frame the clock stops in.
+/// The engine's own events go under the base game, and one whose code no mod loaded is left
+/// untimed, as a deferred action from such code is. The interface's own event is timed from
+/// the clock stop instead, since it finishes within the frame the clock stops in.
 /// </para>
 /// <para>
 /// Time the game spends paused is left out. The engine keeps running in the background only
@@ -42,6 +43,7 @@ internal static class PostLoadTracker
     private static bool _done;
     private static LongEventHandler.QueuedLongEvent? _current;
     private static ModContentPack? _currentOwner;
+    private static bool _currentIsBaseGame;
     private static string? _currentCategory;
 
     private static float _lastIdleFrameMs = -1f;
@@ -304,25 +306,19 @@ internal static class PostLoadTracker
     {
         _current = queuedEvent;
         _currentCategory = $"{Category}|{Describe(queuedEvent)}";
-        _currentOwner = OwnerOf(queuedEvent);
-        StartTiming(_currentOwner, _currentCategory);
+        _currentOwner = OwnerOf(queuedEvent, out _currentIsBaseGame);
+        StartTiming(_currentOwner, _currentIsBaseGame, _currentCategory);
     }
 
     /// <summary>
-    /// Starts <paramref name="category"/> under <paramref name="owner"/>, or under the base
-    /// game when it is null, making this thread, the main one, the active thread first.
+    /// Starts <paramref name="category"/> under its owner, as
+    /// <see cref="StartupImpactProfilerUtil.Start"/> does, making this thread, the main one,
+    /// the active thread first.
     /// </summary>
-    internal static void StartTiming(ModContentPack? owner, string category)
+    internal static void StartTiming(ModContentPack? owner, bool isBaseGame, string category)
     {
         TimeOnThisThread();
-        if (owner == null)
-        {
-            StartupImpactProfilerUtil.StartBaseGameProfiler(category);
-        }
-        else
-        {
-            StartupImpactProfilerUtil.StartModProfiler(owner, category);
-        }
+        StartupImpactProfilerUtil.Start(owner, isBaseGame, category);
     }
 
     // Stops timing the current event, taking discountMs, time the game sat paused, back off.
@@ -333,36 +329,37 @@ internal static class PostLoadTracker
             return;
         }
 
-        var startupImpact = LoadingProgressMod.instance.StartupImpact;
-        if (_currentOwner == null)
-        {
-            StartupImpactProfilerUtil.StopBaseGameProfiler(_currentCategory);
-            startupImpact.BaseGameProfiler.Discount(_currentCategory, discountMs);
-        }
-        else
-        {
-            StartupImpactProfilerUtil.StopModProfiler(_currentOwner, _currentCategory);
-            startupImpact
-                .Modlist.GetModInfoFor(_currentOwner)
-                ?.Profiler.Discount(_currentCategory, discountMs);
-        }
+        StartupImpactProfilerUtil.Stop(
+            _currentOwner,
+            _currentIsBaseGame,
+            _currentCategory,
+            discountMs
+        );
 
         _current = null;
         _currentOwner = null;
+        _currentIsBaseGame = false;
         _currentCategory = null;
     }
 
-    internal static ModContentPack? OwnerOf(LongEventHandler.QueuedLongEvent queuedEvent) =>
-        OwnerOf(queuedEvent.eventAction, queuedEvent.eventActionEnumerator);
+    internal static ModContentPack? OwnerOf(
+        LongEventHandler.QueuedLongEvent queuedEvent,
+        out bool isBaseGame
+    ) => OwnerOf(queuedEvent.eventAction, queuedEvent.eventActionEnumerator, out isBaseGame);
 
     /// <summary>
-    /// The mod whose code an event runs, or null for the base game.
+    /// The mod whose code an event runs, by the rule a deferred action's code follows: see
+    /// <see cref="StartupImpactProfilerUtil.OwnerOfCode"/>.
     /// </summary>
-    internal static ModContentPack? OwnerOf(Delegate? action, object? enumerator)
-    {
-        var assembly = action?.Method.DeclaringType?.Assembly ?? enumerator?.GetType().Assembly;
-        return assembly == null ? null : Utilities.FindModByAssembly(assembly);
-    }
+    internal static ModContentPack? OwnerOf(
+        Delegate? action,
+        object? enumerator,
+        out bool isBaseGame
+    ) =>
+        StartupImpactProfilerUtil.OwnerOfCode(
+            action?.Method.DeclaringType?.Assembly ?? enumerator?.GetType().Assembly,
+            out isBaseGame
+        );
 
     internal static string Describe(LongEventHandler.QueuedLongEvent queuedEvent) =>
         Describe(

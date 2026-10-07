@@ -43,6 +43,21 @@ internal sealed class PostLoadTrackerTests
             PostLoadTracker.HasLeftForAGame(ProgramState.Entry, quickStarted: false, null)
         );
 
+    // A mod that keeps a long event queued on the menu used to keep the loading window over it
+    // for good. Past MaxTailMs of active time, the startup ends without a time to the menu.
+    [Test]
+    public static void AMenuThatNeverSettlesEndsTheWaitAtTheLimit()
+    {
+        Expect.IsFalse(
+            PostLoadTracker.HasWaitedTooLong(1000f, 1000f + PostLoadTracker.MaxTailMs - 1f)
+        );
+        Expect.IsTrue(PostLoadTracker.HasWaitedTooLong(1000f, 1000f + PostLoadTracker.MaxTailMs));
+    }
+
+    [Test]
+    public static void NothingHasWaitedBeforeTheWaitBegins() =>
+        Expect.IsFalse(PostLoadTracker.HasWaitedTooLong(-1f, PostLoadTracker.MaxTailMs * 2f));
+
     [Test]
     public static void TheFirstIdleFrameNeverSettlesTheMenu() =>
         Expect.IsFalse(PostLoadTracker.IsMenuSettled(-1f, 100000f, 1));

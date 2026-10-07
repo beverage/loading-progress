@@ -560,11 +560,8 @@ internal sealed class Settings : ModSettings
 
         listingStandard.Gap();
 
-        if (LoadingProgressWindow.CurrentLoadingTime is { } loadingTime)
+        if (LoadingProgressWindow.LoadingTimeText is { } text)
         {
-            string text = "LoadingProgress.LoadingTime".Translate(
-                Utilities.FormatDuration(loadingTime)
-            );
             if (
                 listingStandard.ButtonTextLabeled(
                     "LoadingProgress.LoadingTimeLabel".Translate(),

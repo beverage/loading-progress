@@ -48,6 +48,12 @@ internal static class PostLoadTracker
     // counts as reached at this many idle frames in a row.
     private const int SlowMenuIdleFrames = 5;
 
+    // A menu that has not settled this long after loading, in active time, is taken never to:
+    // a mod that keeps a long event queued on the menu would otherwise keep the loading window
+    // over it for good. The wait after loading takes 20 to 30 s on a list of 230 mods.
+    internal const float MaxTailMs = 5f * 60f * 1000f;
+    private static float _tailStartMs = -1f;
+
     private static bool _done;
     private static LongEventHandler.QueuedLongEvent? _current;
     private static ModContentPack? _currentOwner;
@@ -109,6 +115,20 @@ internal static class PostLoadTracker
             return;
         }
 
+        var active = now - _pausedMs;
+        if (_tailStartMs < 0f)
+        {
+            _tailStartMs = active;
+        }
+        if (HasWaitedTooLong(_tailStartMs, active))
+        {
+            LoadingProgressMod.Warning(
+                $"The main menu had not settled {MaxTailMs / 60000f} minutes after loading, so the startup ends without a time to it."
+            );
+            Finish(startupImpact, paused, menuReached: false);
+            return;
+        }
+
         var current = LongEventHandler.currentEvent;
         if (timing && (!ReferenceEquals(current, _current) || paused > 0f))
         {
@@ -137,7 +157,6 @@ internal static class PostLoadTracker
             // and the next, so the menu counts as reached only once two idle frames have come
             // close together, which includes any such stall in the time to the menu. Pauses
             // are left out of the comparison, so one is not mistaken for a stall.
-            var active = now - _pausedMs;
             _idleFrames++;
             var settled = IsMenuSettled(_lastIdleFrameMs, active, _idleFrames);
             _lastIdleFrameMs = active;
@@ -309,10 +328,10 @@ internal static class PostLoadTracker
     }
 
     /// <summary>
-    /// Ends the tail: the window records its loading time and leaves, and the startup takes its
-    /// time to the menu when the menu was reached, then saves its session once. The event
-    /// current until now is stopped with <paramref name="pausedThisFrame"/>, the pause before
-    /// this frame, taken back off its time.
+    /// Ends the tail: the window leaves, and records its loading time when the menu was
+    /// reached, as the startup takes its time to the menu; then the startup saves its session
+    /// once. The event current until now is stopped with <paramref name="pausedThisFrame"/>,
+    /// the pause before this frame, taken back off its time.
     /// </summary>
     private static void Finish(
         StartupImpact? startupImpact,
@@ -335,13 +354,20 @@ internal static class PostLoadTracker
         }
         try
         {
-            LoadingProgressWindow.CompleteStartup(_pausedMs);
+            LoadingProgressWindow.CompleteStartup(_pausedMs, recordLoadingTime: menuReached);
         }
         finally
         {
             startupImpact?.FinishStartup();
         }
     }
+
+    /// <summary>
+    /// Whether the menu has gone <see cref="MaxTailMs"/> of active time since the wait after
+    /// loading began, at <paramref name="tailStartMs"/>, without settling.
+    /// </summary>
+    internal static bool HasWaitedTooLong(float tailStartMs, float nowMs) =>
+        tailStartMs >= 0f && nowMs - tailStartMs >= MaxTailMs;
 
     /// <summary>
     /// Whether the startup has gone into a game instead of to the main menu: the program has

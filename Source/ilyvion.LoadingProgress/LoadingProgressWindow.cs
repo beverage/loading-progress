@@ -51,16 +51,40 @@ internal sealed partial class LoadingProgressWindow
     internal static int _currentModHash;
 
     /// <summary>
-    /// How long this launch took to load, set once the startup has reached the main menu or
-    /// gone straight into a game, where the loading window records it.
+    /// How long this launch took to load, set once the startup has reached the main menu,
+    /// where the loading window records it. A startup that went straight into a game, or whose
+    /// menu never settled, records none.
     /// </summary>
     internal static TimeSpan? CurrentLoadingTime { get; private set; }
 
+    // Whether the startup ended with no loading time to record, not reaching the main menu.
+    private static bool _loadingTimeNotRecorded;
+
     /// <summary>
-    /// Whether this startup has reached the main menu, or gone straight into a game: the
-    /// point the loading window leaves the screen and the loading time is recorded.
+    /// Whether this startup is over: it has reached the main menu, gone straight into a game,
+    /// or waited for a menu that never settled as long as it waits. The loading window leaves
+    /// the screen then, and records a loading time only for the first.
     /// </summary>
     internal static bool StartupComplete { get; private set; }
+
+    /// <summary>
+    /// What the main menu's corner, the pause menu and the mod settings show for this launch's
+    /// loading time, each a way into its startup impact: see
+    /// <see cref="LoadingTimeTextFor"/>.
+    /// </summary>
+    internal static string? LoadingTimeText =>
+        LoadingTimeTextFor(CurrentLoadingTime, _loadingTimeNotRecorded);
+
+    /// <summary>
+    /// The loading time's text: the time, or that none was recorded when
+    /// <paramref name="notRecorded"/>, as for a startup that never reached the main menu;
+    /// null while there is neither, as before the startup ends.
+    /// </summary>
+    internal static string? LoadingTimeTextFor(TimeSpan? loadingTime, bool notRecorded) =>
+        loadingTime is { } time
+            ? "LoadingProgress.LoadingTime".Translate(Utilities.FormatDuration(time)).ToString()
+        : notRecorded ? "LoadingProgress.LoadingTimeNotRecorded".Translate().ToString()
+        : null;
 
     /// <summary>
     /// Which of the mod's windows stands in for vanilla's status box right now.
@@ -109,9 +133,11 @@ internal sealed partial class LoadingProgressWindow
             : Translations.GetTranslation("LoadingProgress.FinishingUp");
 
     /// <summary>
-    /// Stops the clock and records the loading time, less <paramref name="pausedMs"/> the
-    /// game sat paused in the background: the startup has reached the main menu, or has gone
-    /// straight into a game.
+    /// Stops the clock as the startup ends, and with <paramref name="recordLoadingTime"/>
+    /// records the loading time, less <paramref name="pausedMs"/> the game sat paused in the
+    /// background. Only a startup that reached the main menu has one: one that went straight
+    /// into a game, or whose menu never settled, leaves without recording a time, which would
+    /// stop short of the menu or take in however long it waited.
     /// </summary>
     /// <remarks>
     /// The long events other mods run after the interface begins initializing, and any stall
@@ -120,7 +146,7 @@ internal sealed partial class LoadingProgressWindow
     /// counts to the same idle frame, so the two figures agree, and the corner shows the same
     /// time.
     /// </remarks>
-    internal static void CompleteStartup(float pausedMs)
+    internal static void CompleteStartup(float pausedMs, bool recordLoadingTime)
     {
         if (StartupComplete)
         {
@@ -131,9 +157,16 @@ internal sealed partial class LoadingProgressWindow
         if (_loadingStopwatch is { } loadingStopwatch)
         {
             loadingStopwatch.Stop();
-            RecordLoadingTime(
-                Math.Max(0f, (float)loadingStopwatch.Elapsed.TotalSeconds - (pausedMs / 1000f))
-            );
+            if (recordLoadingTime)
+            {
+                RecordLoadingTime(
+                    Math.Max(0f, (float)loadingStopwatch.Elapsed.TotalSeconds - (pausedMs / 1000f))
+                );
+            }
+            else
+            {
+                _loadingTimeNotRecorded = true;
+            }
         }
         Translations.Clear();
     }

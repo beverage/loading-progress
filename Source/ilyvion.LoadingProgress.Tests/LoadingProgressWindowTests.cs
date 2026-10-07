@@ -5,6 +5,25 @@ namespace ilyvion.LoadingProgress.Tests;
 [TestFixture(TestType.MainMenu)]
 internal sealed class LoadingProgressWindowTests
 {
+    // A startup that ends without a loading time, at the limit on the wait after loading or by
+    // going into a game, keeps its way into the startup impact window: the corner, the pause
+    // menu and the settings say no time was recorded rather than showing nothing.
+    [Test]
+    public static void AStartupWithNoLoadingTimeStillShowsItsLink()
+    {
+        Expect.AreEqual(
+            "LoadingProgress.LoadingTimeNotRecorded".Translate().ToString(),
+            LoadingProgressWindow.LoadingTimeTextFor(null, notRecorded: true)
+        );
+        Expect.AreEqual(
+            "LoadingProgress.LoadingTime"
+                .Translate(Utilities.FormatDuration(TimeSpan.FromSeconds(90)))
+                .ToString(),
+            LoadingProgressWindow.LoadingTimeTextFor(TimeSpan.FromSeconds(90), notRecorded: false)
+        );
+        Expect.IsNull(LoadingProgressWindow.LoadingTimeTextFor(null, notRecorded: false));
+    }
+
     [Test]
     public static void TheLoadingWindowStaysWhileLoadingRuns() =>
         Expect.AreEqual(

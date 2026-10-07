@@ -31,10 +31,9 @@ namespace ilyvion.LoadingProgress.StartupImpact;
 internal static class PostLoadTracker
 {
     /// <summary>
-    /// What everything timed after loading is timed under, the events and Loading Progress's
-    /// own work alike: the remaining time's entry for after loading takes what is timed under
-    /// it back off. Something timed then under any other key would count in its owner's time
-    /// and again in that entry.
+    /// What everything timed after loading is timed under: the remaining time's entry for after
+    /// loading takes what is timed under it back off. Something timed then under any other key
+    /// would count in its owner's time and again in that entry.
     /// </summary>
     internal const string Category = "LoadingProgress.StartupImpact.PostLoadLongEvent";
 
@@ -182,36 +181,10 @@ internal static class PostLoadTracker
     }
 
     /// <summary>
-    /// Runs Loading Progress's own work during the tail, such as saving its report, timed
-    /// under Loading Progress rather than under whichever event it runs inside.
-    /// </summary>
-    internal static void RunAsOwnWork(string description, Action work)
-    {
-        TimeOnThisThread();
-        var resume = _current;
-        StopCurrent(0f);
-        var mod = LoadingProgressMod.instance.Content;
-        var category = $"{Category}|{description}";
-        StartupImpactProfilerUtil.StartModProfiler(mod, category);
-        try
-        {
-            work();
-        }
-        finally
-        {
-            StartupImpactProfilerUtil.StopModProfiler(mod, category);
-            if (resume != null && !_done)
-            {
-                StartCurrent(resume);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Ends the tail: the window records its loading time and leaves, and the tracker, when
-    /// the menu was reached, takes its time to it. The event current until now is stopped
-    /// with <paramref name="pausedThisFrame"/>, the pause before this frame, taken back off
-    /// its time.
+    /// Ends the tail: the window records its loading time and leaves, and the startup takes its
+    /// time to the menu when the menu was reached, then saves its session once. The event
+    /// current until now is stopped with <paramref name="pausedThisFrame"/>, the pause before
+    /// this frame, taken back off its time.
     /// </summary>
     private static void Finish(
         StartupImpact? startupImpact,
@@ -225,10 +198,20 @@ internal static class PostLoadTracker
         {
             Application.focusChanged -= OnFocusChanged;
         }
-        LoadingProgressWindow.CompleteStartup(_pausedMs);
+
+        // The time to the menu is taken before the window's bookkeeping, which writes the
+        // settings, and the session is saved even if that bookkeeping throws.
         if (menuReached)
         {
             startupImpact?.MarkMenuReached(_pausedMs);
+        }
+        try
+        {
+            LoadingProgressWindow.CompleteStartup(_pausedMs);
+        }
+        finally
+        {
+            startupImpact?.FinishStartup();
         }
     }
 

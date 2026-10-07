@@ -481,11 +481,7 @@ internal sealed class DialogStartupImpactHistory : Window
                     : "LoadingProgress.StartupImpact.History.Note.ToEndOfLoading"
                         .Translate()
                         .ToString()
-            : string.IsNullOrEmpty(entry.LastStage)
-                ? "LoadingProgress.StartupImpact.History.Note.Unfinished".Translate().ToString()
-                : "LoadingProgress.StartupImpact.History.Note.UnfinishedAt"
-                    .Translate(StartupImpactSessionIndexEntry.TranslateStage(entry.LastStage))
-                    .ToString();
+            : StartupImpactSessionIndexEntry.UnfinishedNote(entry.LastStage);
 
     private static Color NoteColorFor(StartupImpactSessionIndexEntry entry, bool comparable) =>
         !entry.Completed ? UnfinishedColor

@@ -663,12 +663,10 @@ internal sealed partial class LoadingProgressWindow
 
                 // Record where a boot that never finishes got to. Guarded on IsActive so a
                 // disabled marker costs a bool read, not an enum name, on every transition.
-                //
-                // Finished is deliberately not recorded. It is set from
-                // InitializingInterface, a separately queued event that runs even when
-                // loading ended before the marker could be cleared, so recording it would
-                // replace the stage the boot stopped at with one it never reached.
-                if (StartupImpactCrashMarker.IsActive && value != LoadingStage.Finished)
+                if (
+                    StartupImpactCrashMarker.IsActive
+                    && StartupImpactCrashMarker.Records(value, PlayDataLoader.Loaded)
+                )
                 {
                     StartupImpactCrashMarker.RecordStage(value.ToString());
                 }

@@ -97,6 +97,21 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
     /// every stage; and Translate pseudo-translates a fallback result in dev
     /// mode, which would garble the one case this exists to serve.
     /// </remarks>
+    /// <summary>
+    /// The history's note on a boot that never finished, from the last stage it recorded:
+    /// where it stopped, or that it stopped after loading, before the main menu was usable.
+    /// </summary>
+    internal static string UnfinishedNote(string? lastStage) =>
+        string.IsNullOrEmpty(lastStage)
+            ? "LoadingProgress.StartupImpact.History.Note.Unfinished".Translate().ToString()
+        : lastStage == nameof(LoadingStage.Finished)
+            ? "LoadingProgress.StartupImpact.History.Note.UnfinishedAfterLoading"
+                .Translate()
+                .ToString()
+        : "LoadingProgress.StartupImpact.History.Note.UnfinishedAt"
+            .Translate(TranslateStage(lastStage!))
+            .ToString();
+
     internal static string TranslateStage(string stageName)
     {
         if (string.IsNullOrEmpty(stageName))
@@ -197,8 +212,8 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
             };
 
     /// <summary>
-    /// Takes the figures of a session saved again under this entry, as happens once the
-    /// main menu comes up and the session gains its time to the menu.
+    /// Takes the figures of a session saved again under this entry, as when the player saves
+    /// a session already in the history by hand.
     /// </summary>
     internal void UpdateFrom(StartupImpactSessionData data)
     {

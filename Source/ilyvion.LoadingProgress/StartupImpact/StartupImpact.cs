@@ -120,116 +120,102 @@ internal sealed class StartupImpact
             StageLedger.Close(ElapsedMs);
             _sessionCapturedAtUtc = DateTime.UtcNow;
 
-            // This boot finished, so the marker no longer describes anything.
-            StartupImpactCrashMarker.Clear();
-
             LoadingProgressMod.instance.harmony.UnpatchCategory(
                 Assembly.GetExecutingAssembly(),
                 "StartupImpact"
             );
 
-            // FinishLoading runs from inside the InitializingInterface long event; defer both of
-            // these until it has finished. They run while that event is still being timed, so
-            // they are timed as Loading Progress's own work instead.
+            // FinishLoading runs inside the interface's own long event, so the previous
+            // startup's record waits until that event has finished, when Scribe is free. It
+            // does not wait for this startup to end: one that stopped on the way would lose it.
             if (PreviousUnfinishedBoot is not null)
             {
-                LongEventHandler.ExecuteWhenFinished(static () =>
-                    PostLoadTracker.RunAsOwnWork(
-                        SavingReportDescription,
-                        static () =>
-                        {
-                            try
-                            {
-                                if (
-                                    LoadingProgressMod
-                                        .instance
-                                        .StartupImpact
-                                        .PreviousUnfinishedBoot is
-                                    { } unfinished
-                                )
-                                {
-                                    Dialog.StartupImpactSessionStorage.RecordUnfinishedBoot(
-                                        unfinished
-                                    );
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                LoadingProgressMod.Error(
-                                    "Failed to record an unfinished boot: " + e
-                                );
-                            }
-                        }
-                    )
-                );
-            }
-
-            if (
-                WasTrackingEnabledAtStartup
-                && LoadingProgressMod.Settings.AutoSaveStartupImpactReport
-            )
-            {
-                LongEventHandler.ExecuteWhenFinished(static () =>
-                    PostLoadTracker.RunAsOwnWork(
-                        SavingReportDescription,
-                        static () =>
-                        {
-                            try
-                            {
-                                Dialog.StartupImpactSessionStorage.SaveAndRecord(
-                                    Dialog.StartupImpactSessionData.FromCurrentSession()
-                                );
-                            }
-                            catch (Exception e)
-                            {
-                                LoadingProgressMod.Error(
-                                    "Failed to auto-save startup impact report: " + e
-                                );
-                            }
-                        }
-                    )
-                );
+                LongEventHandler.ExecuteWhenFinished(RecordPreviousUnfinishedBoot);
             }
         }
     }
 
-    private static string SavingReportDescription =>
-        "LoadingProgress.StartupImpact.SavingReport".Translate().ToString();
-
-    /// <summary>
-    /// Takes the time to the main menu, less <paramref name="pausedMs"/> the game sat paused
-    /// in the background on the way, then rewrites the session with it and with the long
-    /// events timed since loading finished. Runs on the main thread at an idle frame, where
-    /// Scribe is safe to use.
-    /// </summary>
-    internal void MarkMenuReached(float pausedMs)
+    private void RecordPreviousUnfinishedBoot()
     {
-        if (TimeToMenu > 0f || !LoadingTimeMeasured)
-        {
-            return;
-        }
-
-        TimeToMenu = Math.Max(TotalLoadingTime, ElapsedMs - pausedMs);
-
-        if (
-            !WasTrackingEnabledAtStartup || !LoadingProgressMod.Settings.AutoSaveStartupImpactReport
-        )
+        if (PreviousUnfinishedBoot is not { } unfinished)
         {
             return;
         }
 
         try
         {
-            Dialog.StartupImpactSessionStorage.SaveAndRecord(
-                Dialog.StartupImpactSessionData.FromCurrentSession()
-            );
+            Dialog.StartupImpactSessionStorage.RecordUnfinishedBoot(unfinished);
         }
         catch (Exception e)
         {
-            LoadingProgressMod.Error(
-                "Failed to update the startup impact report with the time to the main menu: " + e
-            );
+            LoadingProgressMod.Error("Failed to record an unfinished boot: " + e);
         }
+    }
+
+    /// <summary>
+    /// Takes the time to the main menu, less <paramref name="pausedMs"/> the game sat paused in
+    /// the background on the way.
+    /// </summary>
+    internal void MarkMenuReached(float pausedMs)
+    {
+        if (LoadingTimeMeasured)
+        {
+            TimeToMenu = Math.Max(TotalLoadingTime, ElapsedMs - pausedMs);
+        }
+    }
+
+    /// <summary>
+    /// Ends the startup, after loading has: saves its session, once, when saving it
+    /// automatically is on, then removes the marker.
+    /// </summary>
+    /// <remarks>
+    /// Saving uses Scribe. An asynchronous long event whose thread is still running may be
+    /// using it, as loading a save does, so the saving then waits until that event has
+    /// finished. The marker stays until then, so a game that stops first leaves it, and the
+    /// next startup records this one as a startup that never finished.
+    /// </remarks>
+    internal void FinishStartup()
+    {
+        if (!LoadingTimeMeasured)
+        {
+            return;
+        }
+
+        if (SavingMustWait(LongEventHandler.eventThread))
+        {
+            LongEventHandler.ExecuteWhenFinished(SaveAtStartupEnd);
+        }
+        else
+        {
+            SaveAtStartupEnd();
+        }
+    }
+
+    /// <summary>
+    /// Whether the end of the startup's saving has to wait for the current long event: its
+    /// thread is running, and could be using Scribe. One queued but not yet started cannot be.
+    /// </summary>
+    internal static bool SavingMustWait(Thread? eventThread) => eventThread is { IsAlive: true };
+
+    // This startup's session, when saving it automatically is on; then the marker, since the
+    // boot it describes is over and recorded.
+    private void SaveAtStartupEnd()
+    {
+        if (WasTrackingEnabledAtStartup && LoadingProgressMod.Settings.AutoSaveStartupImpactReport)
+        {
+            try
+            {
+                Dialog.StartupImpactSessionStorage.SaveAndRecord(
+                    Dialog.StartupImpactSessionData.FromCurrentSession()
+                );
+            }
+            catch (Exception e)
+            {
+                LoadingProgressMod.Error("Failed to auto-save startup impact report: " + e);
+            }
+        }
+
+        StartupImpactCrashMarker.Clear();
     }
 
     public void UpdateActiveThreadId() => _activeThreadId = Environment.CurrentManagedThreadId;

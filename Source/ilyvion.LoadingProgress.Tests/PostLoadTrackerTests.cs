@@ -203,47 +203,6 @@ internal sealed class PostLoadTrackerTests
         }
     }
 
-    // The same for Loading Progress's own work after loading, such as saving its report.
-    [Test]
-    public static IEnumerator WorkTimedAfterLoadingCountsOnTheMainThread()
-    {
-        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
-        {
-            Test.Skip(TestStartup.TrackingOff);
-            yield break;
-        }
-
-        var framesWaited = 0;
-        while (TestStartup.StillStartingUp(ref framesWaited))
-        {
-            yield return null;
-        }
-
-        const string description = nameof(PostLoadTrackerTests);
-        var category = $"{PostLoadTracker.Category}|{description}";
-        var startupImpact = LoadingProgressMod.instance.StartupImpact;
-        var info = startupImpact.Modlist.GetModInfoFor(LoadingProgressMod.instance.Content);
-        Expect.IsNotNull(info);
-        var profiler = info!.Profiler;
-
-        // As though the loading thread were still the active one.
-        Task.Run(startupImpact.UpdateActiveThreadId).Wait();
-        try
-        {
-            Expect.IsFalse(startupImpact.IsActiveThread());
-
-            PostLoadTracker.RunAsOwnWork(description, () => { });
-
-            Expect.IsTrue(startupImpact.IsActiveThread());
-            Expect.IsTrue(profiler.Metrics.ContainsKey(category));
-        }
-        finally
-        {
-            startupImpact.UpdateActiveThreadId();
-            TestStartup.Forget(profiler, category);
-        }
-    }
-
     // An event that was current through a pause is stopped with the pause taken back off, on
     // the timer it was started on. A pause longer than the event leaves it nothing.
     [Test]

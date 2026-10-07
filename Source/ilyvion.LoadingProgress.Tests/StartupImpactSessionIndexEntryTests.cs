@@ -68,10 +68,10 @@ internal sealed class StartupImpactSessionIndexEntryTests
         Expect.IsFalse(entry.MeasuredToMenu);
     }
 
-    // The session is first recorded when loading finishes and recorded again at the main menu,
-    // under the same entry, which then takes the time to the menu.
+    // A session already in the history that is saved again, by hand, keeps its entry, which
+    // takes the figures it was saved with.
     [Test]
-    public static void SavingTheSessionAgainAtTheMenuUpdatesItsEntry()
+    public static void SavingTheSessionAgainUpdatesItsEntry()
     {
         var entry = StartupImpactSessionIndexEntry.ForCompletedSession("again", Session(0f));
 
@@ -97,5 +97,25 @@ internal sealed class StartupImpactSessionIndexEntryTests
             second
         );
         Expect.AreNotEqual(nameof(LoadingStage.ExecuteToExecuteWhenFinished2), second);
+    }
+
+    // The marker stays until the startup's session is saved, so a boot can stop after loading.
+    // That stage's own text is the loading window's 'Finished!', which reads wrong after
+    // 'Stopped at', so it has a note of its own.
+    [Test]
+    public static void ABootThatStoppedAfterLoadingSaysSo()
+    {
+        Expect.AreEqual(
+            "LoadingProgress.StartupImpact.History.Note.UnfinishedAfterLoading"
+                .Translate()
+                .ToString(),
+            StartupImpactSessionIndexEntry.UnfinishedNote(nameof(LoadingStage.Finished))
+        );
+        Expect.AreEqual(
+            "LoadingProgress.StartupImpact.History.Note.UnfinishedAt"
+                .Translate(StartupImpactSessionIndexEntry.TranslateStage("LoadModXml"))
+                .ToString(),
+            StartupImpactSessionIndexEntry.UnfinishedNote("LoadModXml")
+        );
     }
 }

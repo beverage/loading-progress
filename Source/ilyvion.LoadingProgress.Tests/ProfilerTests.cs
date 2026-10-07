@@ -43,6 +43,23 @@ internal sealed class ProfilerTests
         Expect.AreApproximatelyEqual(100f, profiler.Stop("outer"));
     }
 
+    // A start hands back the open category's time before it opens the new one, so a start
+    // that throws while recording that time has opened nothing: the open category is still on
+    // top for the stop that was always coming for it.
+    [Test]
+    public static void TheOpenCategoryStaysOnTopUntilTheNewOneIsPushed()
+    {
+        var profiler = new ScriptedProfiler(300f, 100f);
+        profiler.Start("outer");
+
+        var outerSoFar = profiler.Interrupt(out var interrupted);
+
+        Expect.AreApproximatelyEqual(300f, outerSoFar);
+        Expect.AreEqual("outer", interrupted);
+        Expect.AreApproximatelyEqual(100f, profiler.Stop("outer", out var stopped));
+        Expect.AreEqual("outer", stopped);
+    }
+
     [Test]
     public static IEnumerator AnOuterCategoryKeepsItsTimeFromBeforeAnInnerOne()
     {

@@ -40,22 +40,44 @@ internal abstract class SingleThreadedProfiler(string measurementTarget)
             return 0f;
         }
 
+        var ms = Interrupt(out interrupted);
+        Push(category);
+        return ms;
+    }
+
+    /// <summary>
+    /// The first half of <see cref="Start(string, out string?)"/>: ends the open category's
+    /// current stretch and starts the clock for a category about to start inside it, which
+    /// <see cref="Push"/> then opens. Until it does, the open category is still the one on top.
+    /// </summary>
+    /// <returns>The same as <see cref="Start(string, out string?)"/>.</returns>
+    public float Interrupt(out string? interrupted)
+    {
         lock (_modificationLock)
         {
-            var ms = 0f;
-            if (_categories.Count > 0)
+            if (_categories.Count == 0)
             {
-                ms = StopAndStart();
-                Total += ms;
-                interrupted = _categories[0];
-            }
-            else
-            {
+                interrupted = null;
                 Start();
+                return 0f;
             }
 
-            _categories.Insert(0, category);
+            var ms = StopAndStart();
+            Total += ms;
+            interrupted = _categories[0];
             return ms;
+        }
+    }
+
+    /// <summary>
+    /// The second half of <see cref="Start(string, out string?)"/>: opens
+    /// <paramref name="category"/> on the clock <see cref="Interrupt"/> started.
+    /// </summary>
+    public void Push(string category)
+    {
+        lock (_modificationLock)
+        {
+            _categories.Insert(0, category);
         }
     }
 

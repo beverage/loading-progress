@@ -16,20 +16,29 @@ internal sealed class Profiler(string measurementTarget) : IDisposable
     private float _offThreadTotalImpact;
     public float OffThreadTotalImpact => _offThreadTotalImpact;
 
+    /// <summary>
+    /// Starts timing <paramref name="category"/> on this thread. When this throws, the
+    /// category was not opened, so a caller that stops only what it started has nothing to
+    /// stop.
+    /// </summary>
     public void Start(string category)
     {
-        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        if (
+            !LoadingProgressMod.Settings.TrackStartupLoadingImpact || string.IsNullOrEmpty(category)
+        )
         {
             return;
         }
 
         // A category open on this thread pauses while this one runs, and what it ran until now
-        // is its own.
-        var ms = _threadLocalProfiler.Value.Start(category, out var interrupted);
+        // is its own. It is recorded before this one is opened, which is the last step.
+        var profiler = _threadLocalProfiler.Value;
+        var ms = profiler.Interrupt(out var interrupted);
         if (interrupted != null)
         {
             Record(interrupted, ms);
         }
+        profiler.Push(category);
     }
 
     public float Stop(string category)

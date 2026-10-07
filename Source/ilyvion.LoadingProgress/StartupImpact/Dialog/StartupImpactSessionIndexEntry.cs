@@ -31,11 +31,10 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
         savedAtUtcTicks == 0 ? DateTime.MinValue : new DateTime(savedAtUtcTicks, DateTimeKind.Utc);
 
     /// <summary>
-    /// The time the session is listed by, in milliseconds: to the first usable
-    /// main-menu frame when the session recorded one, else to the point the
-    /// clock stopped (see <see cref="ListedTime"/>); 0 for a boot that never
-    /// finished. Note this is not the unit Settings.LoadingTimes uses, which is
-    /// seconds.
+    /// The time the session is listed by, in milliseconds: the startup time the
+    /// startup impact window gives it (see <see cref="ListedTime"/>); 0 for a
+    /// boot that never finished. Note this is not the unit Settings.LoadingTimes
+    /// uses, which is seconds.
     /// </summary>
     public float LoadingTime => loadingTime;
 
@@ -214,12 +213,11 @@ internal sealed class StartupImpactSessionIndexEntry : IExposable
     }
 
     /// <summary>
-    /// The time a session is listed by: to the first usable main-menu frame when the session
-    /// recorded one, else to the point the clock stopped. The same figure the startup impact
-    /// window puts in its title.
+    /// The time a session is listed by, the startup time the startup impact window puts in its
+    /// title: see <see cref="StartupImpactSessionViewData.Span(StartupImpactSessionData)"/>.
     /// </summary>
     internal static float ListedTime(StartupImpactSessionData data) =>
-        Math.Max(data.LoadingTime, data.TimeToMenu);
+        StartupImpactSessionViewData.Span(data);
 
     internal static StartupImpactSessionIndexEntry ForUnfinishedBoot(
         string id,

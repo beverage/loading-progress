@@ -86,10 +86,10 @@ internal sealed class StartupImpactSessionViewData
         categoryColorsRemaining.AsReadOnly();
 
     /// <summary>
-    /// The span the totals bar covers: the loading time, or the time to the main menu when the
-    /// session recorded one, since what ran between the two is counted as well.
+    /// The span the totals bar covers, which the window's title gives as the startup time: see
+    /// <see cref="Span(float, float, float, float)"/>.
     /// </summary>
-    public float TotalWindow => Math.Max(sessionData.LoadingTime, sessionData.TimeToMenu);
+    public float TotalWindow { get; private set; }
 
     /// <summary>
     /// The remaining part of the startup time: what is left of the window once the mods,
@@ -264,12 +264,17 @@ internal sealed class StartupImpactSessionViewData
         categories.Clear();
         categories.AddRange(categorySet.OrderBy(category => category));
 
+        // A session with no loading time takes its timed steps as one. Any other keeps the
+        // stored loading time as the point the clock stopped, which is what the session file
+        // and external tools read, even when the steps come to more: the bar widens instead.
         var totalLoadingTime = ModsLoadingTime + hiddenModsLoadingTime + BasegameLoadingTime;
+        TotalWindow = Span(
+            sessionData.LoadingTime,
+            sessionData.TimeToMenu,
+            PostLoadAttributedTime(sessionData),
+            totalLoadingTime
+        );
         if (sessionData.LoadingTime == 0)
-        {
-            sessionData.OverrideLoadingTime(totalLoadingTime);
-        }
-        else if (totalLoadingTime > TotalWindow)
         {
             sessionData.OverrideLoadingTime(totalLoadingTime);
         }
@@ -369,7 +374,7 @@ internal sealed class StartupImpactSessionViewData
                 sessionData.StageTimings,
                 sessionData.LoadingTime,
                 sessionData.TimeToMenu,
-                PostLoadAttributedTime()
+                PostLoadAttributedTime(sessionData)
             )
         );
         if (remainingByStage.Count == 0)
@@ -435,6 +440,32 @@ internal sealed class StartupImpactSessionViewData
     }
 
     /// <summary>
+    /// The startup time a session is shown and listed by: its time to the main menu when it
+    /// recorded one. Without one, as when the startup went into a game or the menu never
+    /// settled, it is the loading time plus what was timed after loading, all of which ran
+    /// after the clock stopped. It is never less than the timed steps' total, so the totals bar
+    /// holds them all.
+    /// </summary>
+    internal static float Span(
+        float loadingTime,
+        float timeToMenu,
+        float postLoadAttributedMs,
+        float timedTotal
+    ) => Math.Max(Math.Max(timeToMenu, loadingTime + postLoadAttributedMs), timedTotal);
+
+    /// <summary>
+    /// <see cref="Span(float, float, float, float)"/> for a stored session.
+    /// </summary>
+    internal static float Span(StartupImpactSessionData sessionData) =>
+        Span(
+            sessionData.LoadingTime,
+            sessionData.TimeToMenu,
+            PostLoadAttributedTime(sessionData),
+            sessionData.Metrics.Sum(entry => entry.Value)
+                + sessionData.Mods.Sum(mod => mod.TotalImpact)
+        );
+
+    /// <summary>
     /// Time between the end of loading and the main menu that some category did account for:
     /// everything timed under <see cref="PostLoadTracker.Category"/>, whoever ran it.
     /// </summary>
@@ -443,7 +474,7 @@ internal sealed class StartupImpactSessionViewData
     /// session has only its metrics to go by. These keep the time the game sat paused in the
     /// background out, as the time to the menu does.
     /// </remarks>
-    private float PostLoadAttributedTime()
+    private static float PostLoadAttributedTime(StartupImpactSessionData sessionData)
     {
         var total = 0f;
         foreach (var entry in sessionData.Metrics)

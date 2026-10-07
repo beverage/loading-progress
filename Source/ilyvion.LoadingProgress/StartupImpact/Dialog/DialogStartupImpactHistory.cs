@@ -470,8 +470,8 @@ internal sealed class DialogStartupImpactHistory : Window
             _ => throw new ArgumentOutOfRangeException(nameof(group), group, null),
         };
 
-    // A session timed only to the end of loading reads shorter than one timed to the main menu,
-    // so it says so rather than passing for a faster run.
+    // A session not timed to the main menu, one from before that was measured or one that went
+    // into a game or whose menu never settled, says so rather than passing for a comparable run.
     private static string NoteFor(StartupImpactSessionIndexEntry entry, bool comparable) =>
         entry.Completed
             ? !comparable

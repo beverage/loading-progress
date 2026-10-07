@@ -121,7 +121,7 @@
     <LoadingProgress.StartupImpact.History.Note.Unfinished>Never finished</LoadingProgress.StartupImpact.History.Note.Unfinished>
     <LoadingProgress.StartupImpact.History.Note.UnfinishedAt>Stopped at {0}</LoadingProgress.StartupImpact.History.Note.UnfinishedAt>
     <LoadingProgress.StartupImpact.History.Note.DifferentList>Different mod list, not comparable</LoadingProgress.StartupImpact.History.Note.DifferentList>
-    <LoadingProgress.StartupImpact.History.Note.ToEndOfLoading>Timed to the end of loading, not to the main menu</LoadingProgress.StartupImpact.History.Note.ToEndOfLoading>
+    <LoadingProgress.StartupImpact.History.Note.ToEndOfLoading>Not timed to the main menu</LoadingProgress.StartupImpact.History.Note.ToEndOfLoading>
     <LoadingProgress.StartupImpact.History.Status.Pinned>Pinned.</LoadingProgress.StartupImpact.History.Status.Pinned>
     <LoadingProgress.StartupImpact.History.Status.Unpinned>Unpinned.</LoadingProgress.StartupImpact.History.Status.Unpinned>
     <LoadingProgress.StartupImpact.History.Status.BaselineSet>Baseline set.</LoadingProgress.StartupImpact.History.Status.BaselineSet>

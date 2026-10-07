@@ -118,6 +118,7 @@ internal sealed class StartupImpactHtmlExporterTests
         foreach (
             var (key, ms) in new[]
             {
+                ("windowMs", viewData.TotalWindow),
                 ("remainingMs", viewData.RemainingLoadingTime),
                 ("remainingBarSpanMs", viewData.RemainingBarSpan),
             }

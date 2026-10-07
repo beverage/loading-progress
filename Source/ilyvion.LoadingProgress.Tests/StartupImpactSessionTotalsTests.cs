@@ -13,9 +13,9 @@ internal sealed class StartupImpactSessionTotalsTests
 
     // Loading stops the clock at 90.6 s and the menu is usable at 110.6 s. The base game has
     // 14.1 s of loading and a 5.9 s long event after it; one mod has 50 s.
-    private static StartupImpactSessionData Session(float timeToMenu) =>
+    private static StartupImpactSessionData Session(float timeToMenu, float loadingTime = 90600f) =>
         StartupImpactSessionData.FromValues(
-            90600f,
+            loadingTime,
             timeToMenu,
             new() { [ClearCache] = 14100f, [PostLoadEvent] = 5900f },
             [
@@ -43,12 +43,46 @@ internal sealed class StartupImpactSessionTotalsTests
         Expect.AreApproximatelyEqual(90600f, session.LoadingTime);
     }
 
+    // A startup that went into a game, or whose menu never settled, has no time to the menu.
+    // Everything timed after loading ran after the clock stopped, so it took at least the two
+    // together. The 5.9 s event used to come off the remaining time instead, which then fell
+    // short of the loading time's own untimed part.
     [Test]
-    public static void WithoutATimeToTheMenuTheTopBarSpansTheLoadingTime() =>
-        Expect.AreApproximatelyEqual(
-            90600f,
-            new StartupImpactSessionViewData(Session(0f)).TotalWindow
-        );
+    public static void WithoutATimeToTheMenuTheTopBarSpansTheLoadingTimeAndWhatCameAfter()
+    {
+        var viewData = new StartupImpactSessionViewData(Session(0f));
+
+        Expect.AreApproximatelyEqual(90600f + 5900f, viewData.TotalWindow);
+        Expect.AreApproximatelyEqual(90600f - 14100f - 50000f, viewData.MetricsTotal[3]);
+    }
+
+    // The history used to list a session by its loading time or its time to the menu, while
+    // the window's title also took in steps past both.
+    [Test]
+    public static void TheHistoryListsASessionByTheTimeTheWindowShows()
+    {
+        foreach (var session in new[] { Session(110600f), Session(0f), Session(0f, 60000f) })
+        {
+            Expect.AreApproximatelyEqual(
+                new StartupImpactSessionViewData(session).TotalWindow,
+                StartupImpactSessionIndexEntry.ListedTime(session)
+            );
+        }
+    }
+
+    // A quicktest records no time to the menu, yet its long events after loading are timed.
+    // When they took the steps past the loading time, the view data used to rewrite the stored
+    // loading time to fit them, and saving the session wrote the inflated figure.
+    [Test]
+    public static void StepsPastTheLoadingTimeWidenTheBarAndLeaveTheLoadingTime()
+    {
+        var session = Session(0f, loadingTime: 60000f);
+        var viewData = new StartupImpactSessionViewData(session);
+
+        Expect.AreApproximatelyEqual(70000f, viewData.TotalWindow);
+        Expect.AreApproximatelyEqual(0f, viewData.MetricsTotal[3]);
+        Expect.AreApproximatelyEqual(60000f, session.LoadingTime);
+    }
 
     // The 5.9 s event after loading has an owner; only the rest of the 20 s is remaining.
     [Test]

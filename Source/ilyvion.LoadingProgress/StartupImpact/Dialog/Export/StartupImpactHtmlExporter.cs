@@ -49,6 +49,8 @@ internal static class StartupImpactHtmlExporter
         AppendNumber(sb, "timeToMenuMs", sessionData.TimeToMenu);
         _ = sb.Append(',');
         AppendRemainingByStage(sb, viewData, defaultColor);
+        AppendNumber(sb, "windowMs", viewData.TotalWindow);
+        _ = sb.Append(',');
         AppendNumber(sb, "remainingMs", viewData.RemainingLoadingTime);
         _ = sb.Append(',');
         AppendNumber(sb, "remainingBarSpanMs", viewData.RemainingBarSpan);
@@ -1032,9 +1034,9 @@ internal static class StartupImpactHtmlExporter
       }
     });
     var baseGameTotal = DATA.baseGame.loadingTimeMs;
-    // What ran between the end of loading and the main menu is counted too, so the bar spans
-    // the time to the menu when the session recorded one.
-    var windowMs = Math.max(DATA.loadingTimeMs, DATA.timeToMenuMs || 0);
+    // The window's own span: the time to the menu when the session recorded one, and never
+    // less than the timed steps.
+    var windowMs = DATA.windowMs;
 
     // The base game's and the remaining segments list what their folded sections hold.
     var cats = DATA.totalCategories;
@@ -1323,7 +1325,7 @@ internal static class StartupImpactHtmlExporter
   }
 
   document.getElementById("title").textContent =
-    DATA.strings.title.replace("{0}", timeText(Math.max(DATA.loadingTimeMs, DATA.timeToMenuMs || 0)));
+    DATA.strings.title.replace("{0}", timeText(DATA.windowMs));
 
   if (DATA.sessionStats) {
     document.getElementById("sessionStats").textContent = DATA.strings.sessionStats

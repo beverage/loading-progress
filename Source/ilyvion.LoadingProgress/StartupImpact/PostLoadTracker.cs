@@ -91,6 +91,23 @@ internal static class PostLoadTracker
         );
         _pausedMs += paused;
 
+        // Straight into a game: there is no idle menu to wait for, and the game's loading is not
+        // the startup's. This is checked before the current event is timed, so that none of the
+        // game's loading is timed as the startup's either: a quicktest asks for the game's scene
+        // while the interface initializes, and a save loaded at startup is an event that loads
+        // that scene.
+        if (
+            HasLeftForAGame(
+                Current.ProgramState,
+                QuickStarter.quickStarted,
+                LongEventHandler.currentEvent?.levelToLoad
+            )
+        )
+        {
+            Finish(startupImpact, paused, menuReached: false);
+            return;
+        }
+
         var current = LongEventHandler.currentEvent;
         if (timing && (!ReferenceEquals(current, _current) || paused > 0f))
         {
@@ -105,13 +122,6 @@ internal static class PostLoadTracker
         if (finished && current != null)
         {
             LoadingProgressWindow.ShowPostLoadEvent(current);
-        }
-
-        if (Current.ProgramState != ProgramState.Entry)
-        {
-            // Straight into a game (a quicktest, say): there is no idle menu to wait for.
-            Finish(startupImpact, menuReached: false);
-            return;
         }
 
         if (
@@ -132,7 +142,9 @@ internal static class PostLoadTracker
             _lastIdleFrameMs = active;
             if (settled)
             {
-                Finish(startupImpact, menuReached: true);
+                // This frame's pause, if any, came off the event that was current through it
+                // above, so nothing is left to take off.
+                Finish(startupImpact, 0f, menuReached: true);
             }
         }
         else
@@ -197,11 +209,17 @@ internal static class PostLoadTracker
 
     /// <summary>
     /// Ends the tail: the window records its loading time and leaves, and the tracker, when
-    /// the menu was reached, takes its time to it.
+    /// the menu was reached, takes its time to it. The event current until now is stopped
+    /// with <paramref name="pausedThisFrame"/>, the pause before this frame, taken back off
+    /// its time.
     /// </summary>
-    private static void Finish(StartupImpact? startupImpact, bool menuReached)
+    private static void Finish(
+        StartupImpact? startupImpact,
+        float pausedThisFrame,
+        bool menuReached
+    )
     {
-        StopCurrent(0f);
+        StopCurrent(pausedThisFrame);
         _done = true;
         if (_watchingFrames)
         {
@@ -213,6 +231,18 @@ internal static class PostLoadTracker
             startupImpact?.MarkMenuReached(_pausedMs);
         }
     }
+
+    /// <summary>
+    /// Whether the startup has gone into a game instead of to the main menu: the program has
+    /// left its entry state, a quicktest has asked for the game's scene, or the current event
+    /// loads that scene, as loading a save does.
+    /// </summary>
+    internal static bool HasLeftForAGame(
+        ProgramState programState,
+        bool quickStarted,
+        string? levelToLoad
+    ) =>
+        programState != ProgramState.Entry || quickStarted || levelToLoad == GenScene.PlaySceneName;
 
     /// <summary>
     /// Whether an idle frame at <paramref name="nowMs"/> counts the menu as usable: the first

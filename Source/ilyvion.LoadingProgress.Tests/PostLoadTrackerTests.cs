@@ -9,6 +9,40 @@ namespace ilyvion.LoadingProgress.Tests;
 [WarningsAllowed(TestStartup.OtherModsWarnings)]
 internal sealed class PostLoadTrackerTests
 {
+    // A quicktest asks for the game's scene while the interface initializes, and the scene
+    // loads before the next frame. The startup used to end only on that frame, so an event
+    // started in between was timed as the startup's and took in the scene's load.
+    [Test]
+    public static void AQuicktestEndsTheStartupWhenItAsksForTheGamesScene() =>
+        Expect.IsTrue(
+            PostLoadTracker.HasLeftForAGame(ProgramState.Entry, quickStarted: true, null)
+        );
+
+    // A save loaded at startup is an event that loads the game's scene, and it runs while the
+    // program is still at its entry state. It used to be timed as an event after loading, and
+    // counted in the loading time.
+    [Test]
+    public static void AnEventThatLoadsTheGamesSceneEndsTheStartup() =>
+        Expect.IsTrue(
+            PostLoadTracker.HasLeftForAGame(
+                ProgramState.Entry,
+                quickStarted: false,
+                GenScene.PlaySceneName
+            )
+        );
+
+    [Test]
+    public static void AGameThatHasStartedEndsTheStartup() =>
+        Expect.IsTrue(
+            PostLoadTracker.HasLeftForAGame(ProgramState.MapInitializing, quickStarted: false, null)
+        );
+
+    [Test]
+    public static void TheEntryStateWithNoGameAskedForIsStillOnTheWayToTheMenu() =>
+        Expect.IsFalse(
+            PostLoadTracker.HasLeftForAGame(ProgramState.Entry, quickStarted: false, null)
+        );
+
     [Test]
     public static void TheFirstIdleFrameNeverSettlesTheMenu() =>
         Expect.IsFalse(PostLoadTracker.IsMenuSettled(-1f, 100000f, 1));

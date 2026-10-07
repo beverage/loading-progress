@@ -231,4 +231,27 @@ internal sealed class StartupImpactSessionViewDataTests
             viewData.LargestBaseGameStepText
         );
     }
+
+    // The remaining heading names the remaining time's largest entry. The window and the HTML
+    // report both show this text.
+    [Test]
+    public static void TheRemainingHeadingNamesItsLargestEntry()
+    {
+        var viewData = new StartupImpactSessionViewData(
+            StartupImpactSessionData.FromValues(
+                10000f,
+                0f,
+                [],
+                [],
+                [new("LoadingDefs", 1500f, 500f), new("AtlasBaking", 3000f, 500f)]
+            )
+        );
+
+        var largest = viewData.RemainingByStage[0];
+        Expect.AreEqual("AtlasBaking", largest.Key);
+        Expect.AreEqual(
+            $"{largest.Label}: {ProfilerBar.TimeText(2500f)}",
+            viewData.LargestRemainingEntryText
+        );
+    }
 }

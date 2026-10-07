@@ -49,7 +49,20 @@ internal static class StartupImpactHtmlExporter
         AppendNumber(sb, "timeToMenuMs", sessionData.TimeToMenu);
         _ = sb.Append(',');
         AppendRemainingByStage(sb, viewData, defaultColor);
-        AppendNumber(sb, "breakdownLines", StartupImpactSessionViewData.BreakdownLines);
+        AppendNumber(sb, "remainingMs", viewData.RemainingLoadingTime);
+        _ = sb.Append(',');
+        AppendNumber(sb, "remainingBarSpanMs", viewData.RemainingBarSpan);
+        _ = sb.Append(',');
+
+        // The folded sections' texts as the window has them. None depends on which mods are
+        // hidden, so the report shows them as they are.
+        AppendString(sb, "baseGameBreakdownText", viewData.BaseGameBreakdownText);
+        _ = sb.Append(',');
+        AppendString(sb, "largestBaseGameStepText", viewData.LargestBaseGameStepText);
+        _ = sb.Append(',');
+        AppendString(sb, "remainingBreakdownText", viewData.RemainingBreakdownText);
+        _ = sb.Append(',');
+        AppendString(sb, "largestRemainingEntryText", viewData.LargestRemainingEntryText);
         _ = sb.Append(',');
 
         AppendKey(sb, "secondsOnly");
@@ -350,24 +363,6 @@ internal static class StartupImpactHtmlExporter
         _ = sb.Append(',');
         AppendString(
             sb,
-            "baseGameBreakdown",
-            "LoadingProgress.StartupImpact.Nonmods.BySteps".Translate()
-        );
-        _ = sb.Append(',');
-        AppendString(
-            sb,
-            "remainingBreakdown",
-            "LoadingProgress.StartupImpact.Remaining.ByStage".Translate()
-        );
-        _ = sb.Append(',');
-        AppendString(
-            sb,
-            "breakdownMore",
-            "LoadingProgress.StartupImpact.Breakdown.More".Translate()
-        );
-        _ = sb.Append(',');
-        AppendString(
-            sb,
             "onOtherThreadsDetail",
             "LoadingProgress.StartupImpact.Section.OnOtherThreads".Translate()
         );
@@ -481,10 +476,17 @@ internal static class StartupImpactHtmlExporter
         _ = sb.Append(value.ToString(CultureInfo.InvariantCulture));
     }
 
-    private static void AppendString(StringBuilder sb, string key, string value)
+    private static void AppendString(StringBuilder sb, string key, string? value)
     {
         AppendKey(sb, key);
-        AppendJsonString(sb, value);
+        if (value == null)
+        {
+            _ = sb.Append("null");
+        }
+        else
+        {
+            AppendJsonString(sb, value);
+        }
     }
 
     private static void AppendKey(StringBuilder sb, string key)
@@ -1015,38 +1017,9 @@ internal static class StartupImpactHtmlExporter
     return max;
   }
 
-  // A breakdown as the window's tooltips give it: the header, then the largest entries, and
-  // how many more there are; null when no entry has a millisecond in it.
-  function breakdownText(header, entries) {
-    var sorted = entries
-      .filter(function (e) { return e.valueMs >= 1; })
-      .sort(function (a, b) { return b.valueMs - a.valueMs; });
-    if (!sorted.length) {
-      return null;
-    }
-    var lines = [header];
-    sorted.slice(0, DATA.breakdownLines).forEach(function (e) {
-      lines.push(e.label + ": " + timeText(e.valueMs));
-    });
-    if (sorted.length > DATA.breakdownLines) {
-      lines.push(DATA.strings.breakdownMore.replace("{0}", sorted.length - DATA.breakdownLines));
-    }
-    return lines.join("\n");
-  }
-
-  // The largest entry and its time, for a folded section's heading.
-  function largestEntryText(entries) {
-    var largest = null;
-    entries.forEach(function (e) {
-      if (e.valueMs >= 1 && (!largest || e.valueMs > largest.valueMs)) {
-        largest = e;
-      }
-    });
-    return largest ? largest.label + ": " + timeText(largest.valueMs) : "";
-  }
-
-  var baseGameBreakdown = breakdownText(DATA.strings.baseGameBreakdown, DATA.baseGame.segments);
-  var remainingBreakdown = breakdownText(DATA.strings.remainingBreakdown, DATA.remainingByStage);
+  // The window's breakdowns of the folded sections, null when a section has none.
+  var baseGameBreakdown = DATA.baseGameBreakdownText;
+  var remainingBreakdown = DATA.remainingBreakdownText;
 
   function renderTotalBar() {
     var modsTotal = 0;
@@ -1062,7 +1035,6 @@ internal static class StartupImpactHtmlExporter
     // What ran between the end of loading and the main menu is counted too, so the bar spans
     // the time to the menu when the session recorded one.
     var windowMs = Math.max(DATA.loadingTimeMs, DATA.timeToMenuMs || 0);
-    var remaining = Math.max(0, windowMs - (modsTotal + hiddenTotal + baseGameTotal));
 
     // The base game's and the remaining segments list what their folded sections hold.
     var cats = DATA.totalCategories;
@@ -1070,7 +1042,7 @@ internal static class StartupImpactHtmlExporter
       { label: cats[0].label, color: cats[0].color, valueMs: modsTotal },
       { label: cats[1].label, color: cats[1].color, valueMs: hiddenTotal },
       { label: cats[2].label, color: cats[2].color, valueMs: baseGameTotal, detail: baseGameBreakdown },
-      { label: cats[3].label, color: cats[3].color, valueMs: remaining, detail: remainingBreakdown }
+      { label: cats[3].label, color: cats[3].color, valueMs: DATA.remainingMs, detail: remainingBreakdown }
     ];
     renderBar(document.getElementById("totalBar"), segments, windowMs);
     document.getElementById("modsTitle").textContent = DATA.strings.modsTitle.replace("{0}", timeText(modsTotal));
@@ -1334,17 +1306,12 @@ internal static class StartupImpactHtmlExporter
     if (!DATA.remainingByStage.length) {
       return;
     }
-    var windowMs = Math.max(DATA.loadingTimeMs, DATA.timeToMenuMs || 0);
-    var attributed = DATA.baseGame.loadingTimeMs
-      + DATA.mods.reduce(function (sum, mod) { return sum + mod.totalImpactMs; }, 0);
-    var remaining = Math.max(0, windowMs - attributed);
-    var entriesTotal = DATA.remainingByStage.reduce(function (sum, e) { return sum + e.valueMs; }, 0);
     document.getElementById("remainingTitle").textContent =
-      DATA.strings.remainingTitle.replace("{0}", timeText(remaining));
-    document.getElementById("remainingDetail").textContent = largestEntryText(DATA.remainingByStage);
+      DATA.strings.remainingTitle.replace("{0}", timeText(DATA.remainingMs));
+    document.getElementById("remainingDetail").textContent = DATA.largestRemainingEntryText || "";
     document.getElementById("remainingSection").style.display = "";
     var bar = document.getElementById("remainingBar");
-    renderBar(bar, DATA.remainingByStage, Math.max(remaining, entriesTotal));
+    renderBar(bar, DATA.remainingByStage, DATA.remainingBarSpanMs);
   }
 
   function renderAll() {
@@ -1371,7 +1338,7 @@ internal static class StartupImpactHtmlExporter
   // and its largest step when it is not.
   document.getElementById("baseGameDetail").textContent = DATA.baseGame.offThreadTotalImpactMs > 1
     ? DATA.strings.onOtherThreadsDetail.replace("{0}", timeText(DATA.baseGame.offThreadTotalImpactMs))
-    : largestEntryText(DATA.baseGame.segments);
+    : DATA.largestBaseGameStepText || "";
 
   // Hovering a section's heading says what a click does and, while the section is closed,
   // shows the breakdown it holds, as the window's headings do.

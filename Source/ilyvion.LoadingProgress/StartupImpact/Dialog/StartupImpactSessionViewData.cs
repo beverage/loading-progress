@@ -27,8 +27,7 @@ internal sealed class StartupImpactSessionViewData
     private const string PostLoadLongEventPrefix =
         "LoadingProgress.StartupImpact.PostLoadLongEvent";
 
-    // How many lines a breakdown in a tooltip lists, largest first; the rest are counted. The
-    // HTML export takes the same number.
+    // How many lines a breakdown in a tooltip lists, largest first; the rest are counted.
     internal const int BreakdownLines = 10;
 
     private readonly StartupImpactSessionData sessionData;
@@ -131,6 +130,12 @@ internal sealed class StartupImpactSessionViewData
     /// remaining heading, or null when there is nothing to say.
     /// </summary>
     public string? RemainingBreakdownText { get; private set; }
+
+    /// <summary>
+    /// The remaining time's largest entry and its time, for the folded remaining heading, or
+    /// null when there are no entries.
+    /// </summary>
+    public string? LargestRemainingEntryText { get; private set; }
 
     /// <summary>
     /// The base game's largest steps as text, for the totals bar's base-game segment and the
@@ -360,6 +365,7 @@ internal sealed class StartupImpactSessionViewData
         metricsRemaining.Clear();
         categoryColorsRemaining.Clear();
         RemainingBreakdownText = null;
+        LargestRemainingEntryText = null;
 
         remainingByStage.AddRange(
             RemainingEntries(
@@ -385,6 +391,8 @@ internal sealed class StartupImpactSessionViewData
             "LoadingProgress.StartupImpact.Remaining.ByStage".Translate().ToString(),
             [.. remainingByStage.Select(entry => (entry.Label, entry.Ms))]
         );
+        var largest = remainingByStage[0];
+        LargestRemainingEntryText = $"{largest.Label}: {ProfilerBar.TimeText(largest.Ms)}";
         RebuildTooltipDetails();
     }
 

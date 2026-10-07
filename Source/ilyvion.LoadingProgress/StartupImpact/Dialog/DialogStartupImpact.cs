@@ -1075,14 +1075,12 @@ internal sealed class DialogStartupImpact : Window
         var title = "LoadingProgress.StartupImpact.StartupRemaining".Translate(
             ProfilerBar.TimeText(_sessionViewData.RemainingLoadingTime)
         );
-        var largest = _sessionViewData.RemainingByStage[0];
-        var detail = $"{largest.Label}: {ProfilerBar.TimeText(largest.Ms)}";
         var settings = LoadingProgressMod.Settings;
         var open = DrawSectionHeading(
             y,
             width,
             title,
-            detail,
+            _sessionViewData.LargestRemainingEntryText,
             _sessionViewData.RemainingBreakdownText,
             settings.ExpandRemainingSection
         );

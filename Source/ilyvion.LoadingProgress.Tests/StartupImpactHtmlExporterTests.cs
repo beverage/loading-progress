@@ -67,8 +67,8 @@ internal sealed class StartupImpactHtmlExporterTests
         );
     }
 
-    // The report's folded headings carry a detail as the window's do, its breakdowns list as
-    // many lines as the window's tooltips, and every bar for time on other threads says so.
+    // The report's folded headings carry a detail as the window's do, and every bar for time
+    // on other threads says so.
     [Test]
     public static void TheReportsSectionsCarryTheWindowsDetailsAndTooltips()
     {
@@ -76,12 +76,6 @@ internal sealed class StartupImpactHtmlExporterTests
 
         Expect.IsTrue(html.Contains("id=\"baseGameDetail\"", StringComparison.Ordinal));
         Expect.IsTrue(html.Contains("id=\"remainingDetail\"", StringComparison.Ordinal));
-        Expect.IsTrue(
-            html.Contains(
-                $"\"breakdownLines\":{StartupImpactSessionViewData.BreakdownLines},",
-                StringComparison.Ordinal
-            )
-        );
         var tip = "LoadingProgress.StartupImpact.OnOtherThreads.Tip".Translate().ToString();
         Expect.IsTrue(html.Contains($"\"onOtherThreadsTip\":\"{tip}\"", StringComparison.Ordinal));
         foreach (
@@ -96,4 +90,47 @@ internal sealed class StartupImpactHtmlExporterTests
             Expect.IsTrue(html.Contains(call, StringComparison.Ordinal));
         }
     }
+
+    // The report's script used to work out the folded sections' breakdowns, their largest
+    // entries and the remaining total again, from a separately exported line count, so a
+    // change to the window's had to be copied into it. It now shows the window's own.
+    [Test]
+    public static void TheReportShowsTheWindowsOwnBreakdownsAndTotals()
+    {
+        var viewData = new StartupImpactSessionViewData(Session);
+        var html = Report(viewData);
+
+        foreach (
+            var (key, text) in new[]
+            {
+                ("baseGameBreakdownText", viewData.BaseGameBreakdownText),
+                ("largestBaseGameStepText", viewData.LargestBaseGameStepText),
+                ("remainingBreakdownText", viewData.RemainingBreakdownText),
+                ("largestRemainingEntryText", viewData.LargestRemainingEntryText),
+            }
+        )
+        {
+            Expect.IsNotNull(text);
+            Expect.IsTrue(
+                html.Contains($"\"{key}\":\"{Escaped(text!)}\",", StringComparison.Ordinal)
+            );
+        }
+        foreach (
+            var (key, ms) in new[]
+            {
+                ("remainingMs", viewData.RemainingLoadingTime),
+                ("remainingBarSpanMs", viewData.RemainingBarSpan),
+            }
+        )
+        {
+            var value = ms.ToString("0.###", CultureInfo.InvariantCulture);
+            Expect.IsTrue(html.Contains($"\"{key}\":{value},", StringComparison.Ordinal));
+        }
+    }
+
+    // A string as the report's data writes it.
+    private static string Escaped(string text) =>
+        text.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
 }

@@ -497,7 +497,10 @@ internal static class StartupImpactHtmlExporter
         _ = sb.Append(':');
     }
 
-    private static void AppendJsonString(StringBuilder sb, string value)
+    /// <summary>
+    /// Writes <paramref name="value"/> as a JSON string, quotes included.
+    /// </summary>
+    internal static void AppendJsonString(StringBuilder sb, string value)
     {
         _ = sb.Append('"');
         foreach (var ch in value)

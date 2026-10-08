@@ -210,6 +210,12 @@ internal sealed class DialogStartupImpact : Window
     private readonly StartupImpactSessionData _currentSessionData;
     private StartupImpactSessionData _sessionData;
     private StartupImpactSessionViewData _sessionViewData;
+
+    // The folded sections' texts, with times written as the setting asks now, like every
+    // other time the window draws.
+    private StartupImpactSessionViewData.SectionTexts SectionTexts =>
+        _sessionViewData.Texts(LoadingProgressMod.Settings.ShowStartupImpactTimesInSecondsOnly);
+
     private string _modFilter = "";
     private List<StartupImpactSessionModViewData> _filteredModViewData = [];
     private SortColumn _sortColumn = SortColumn.Impact;
@@ -650,7 +656,7 @@ internal sealed class DialogStartupImpact : Window
         y += titleRect.height;
 
         Rect profileRect = new(0, y, area.width, BarHeight);
-        profilerBar.TooltipDetails = _sessionViewData.TotalsTooltipDetails;
+        profilerBar.TooltipDetails = SectionTexts.TotalsTooltipDetails;
         profilerBar.ShowSegmentLabels = true;
         profilerBar.Draw(
             profileRect,
@@ -1003,17 +1009,18 @@ internal sealed class DialogStartupImpact : Window
         var title = "LoadingProgress.StartupImpact.StartupNonmods".Translate(
             ProfilerBar.TimeText(_sessionViewData.BasegameLoadingTime)
         );
+        var texts = SectionTexts;
         var detail = showOffThread
             ? "LoadingProgress.StartupImpact.Section.OnOtherThreads"
                 .Translate(ProfilerBar.TimeText(_sessionViewData.OffThreadBasegameLoadingTime))
                 .ToString()
-            : _sessionViewData.LargestBaseGameStepText;
+            : texts.LargestBaseGameStep;
         var open = DrawSectionHeading(
             y,
             width,
             title,
             detail,
-            _sessionViewData.BaseGameBreakdownText,
+            texts.BaseGameBreakdown,
             static settings => settings.ExpandBaseGameSection,
             static (settings, value) => settings.ExpandBaseGameSection = value
         );
@@ -1081,8 +1088,8 @@ internal sealed class DialogStartupImpact : Window
             y,
             width,
             title,
-            _sessionViewData.LargestRemainingEntryText,
-            _sessionViewData.RemainingBreakdownText,
+            SectionTexts.LargestRemainingEntry,
+            SectionTexts.RemainingBreakdown,
             static settings => settings.ExpandRemainingSection,
             static (settings, value) => settings.ExpandRemainingSection = value
         );

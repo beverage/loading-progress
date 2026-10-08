@@ -198,16 +198,17 @@ internal sealed class StartupImpactSessionViewDataTests
             StartupImpactSessionData.FromCurrentSession()
         );
 
-        var details = viewData.TotalsTooltipDetails;
+        var texts = viewData.Texts(secondsOnly: false);
+        var details = texts.TotalsTooltipDetails;
         Expect.IsTrue(
             details.ContainsKey("LoadingProgress.StartupImpact.Total.BaseGame")
-                == (viewData.BaseGameBreakdownText != null)
+                == (texts.BaseGameBreakdown != null)
         );
         Expect.IsTrue(
             details.ContainsKey("LoadingProgress.StartupImpact.Total.Others")
-                == (viewData.RemainingBreakdownText != null)
+                == (texts.RemainingBreakdown != null)
         );
-        Expect.IsTrue(viewData.BasegameLoadingTime < 1f || viewData.BaseGameBreakdownText != null);
+        Expect.IsTrue(viewData.BasegameLoadingTime < 1f || texts.BaseGameBreakdown != null);
     }
 
     // A breakdown lists its largest lines and counts the rest, so a reader adding up the
@@ -222,7 +223,9 @@ internal sealed class StartupImpactSessionViewDataTests
                 .Select(i => ($"Step {i}", 100f - i)),
         ];
 
-        var shown = StartupImpactSessionViewData.Breakdown("Header:", lines).Split('\n');
+        var shown = StartupImpactSessionViewData
+            .Breakdown("Header:", lines, secondsOnly: false)
+            .Split('\n');
 
         Expect.AreEqual(StartupImpactSessionViewData.BreakdownLines + 2, shown.Length);
         Expect.AreEqual("Header:", shown[0]);
@@ -236,7 +239,10 @@ internal sealed class StartupImpactSessionViewDataTests
     public static void ABreakdownThatFitsHasNoCount() =>
         Expect.AreEqual(
             2,
-            StartupImpactSessionViewData.Breakdown("Header:", [("Step", 5f)]).Split('\n').Length
+            StartupImpactSessionViewData
+                .Breakdown("Header:", [("Step", 5f)], secondsOnly: false)
+                .Split('\n')
+                .Length
         );
 
     // With the base game's off-thread bar hidden, which is the default, its folded heading
@@ -257,8 +263,8 @@ internal sealed class StartupImpactSessionViewDataTests
         );
 
         Expect.AreEqual(
-            $"{StartupImpactProfilerUtil.TranslateCategory(Large)}: {ProfilerBar.TimeText(3000f)}",
-            viewData.LargestBaseGameStepText
+            $"{StartupImpactProfilerUtil.TranslateCategory(Large)}: {ProfilerBar.TimeText(3000f, false)}",
+            viewData.Texts(secondsOnly: false).LargestBaseGameStep
         );
     }
 
@@ -280,8 +286,38 @@ internal sealed class StartupImpactSessionViewDataTests
         var largest = viewData.RemainingByStage[0];
         Expect.AreEqual("AtlasBaking", largest.Key);
         Expect.AreEqual(
-            $"{largest.Label}: {ProfilerBar.TimeText(2500f)}",
-            viewData.LargestRemainingEntryText
+            $"{largest.Label}: {ProfilerBar.TimeText(2500f, false)}",
+            viewData.Texts(secondsOnly: false).LargestRemainingEntry
         );
+    }
+
+    // The section texts used to be written once, with the seconds-only setting of when the
+    // window opened, while the titles beside them follow the setting as it is. Ticking it in
+    // the settings window behind the open window turned a heading's time to seconds and left a
+    // minute-long entry beside it in minutes. The texts are now written as each caller asks.
+    [Test]
+    public static void TheSectionTextsAreWrittenAsTheyAreAskedFor()
+    {
+        const string Step = "LoadingProgress.StartupImpact.GarbageCollection";
+        var viewData = new StartupImpactSessionViewData(
+            StartupImpactSessionData.FromValues(
+                100000f,
+                0f,
+                new() { [Step] = 62300f },
+                [],
+                [new("LoadingDefs", 80000f, 17700f)]
+            )
+        );
+
+        foreach (var secondsOnly in new[] { false, true, false })
+        {
+            var texts = viewData.Texts(secondsOnly);
+            var time = ProfilerBar.TimeText(62300f, secondsOnly);
+            Expect.IsTrue(texts.LargestBaseGameStep!.EndsWith(time, StringComparison.Ordinal));
+            Expect.IsTrue(texts.LargestRemainingEntry!.EndsWith(time, StringComparison.Ordinal));
+            Expect.IsTrue(texts.BaseGameBreakdown!.Contains(time, StringComparison.Ordinal));
+            Expect.IsTrue(texts.RemainingBreakdown!.Contains(time, StringComparison.Ordinal));
+        }
+        Expect.AreNotEqual(ProfilerBar.TimeText(62300f, false), ProfilerBar.TimeText(62300f, true));
     }
 }

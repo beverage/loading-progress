@@ -44,6 +44,9 @@ internal sealed class StartupImpactSessionViewData
     private readonly List<string> categoriesRemaining = [];
     private readonly List<float> metricsRemaining = [];
     private readonly Dictionary<string, Color> categoryColorsRemaining = [];
+    private readonly List<(string Label, float Ms)> baseGameSteps = [];
+    private SectionTexts? texts;
+    private bool textsSecondsOnly;
 
     internal IReadOnlyList<StartupImpactSessionModViewData> ModViewData => modViewData.AsReadOnly();
 
@@ -139,37 +142,102 @@ internal sealed class StartupImpactSessionViewData
     public IReadOnlyList<RemainingEntry> RemainingByStage => remainingByStage.AsReadOnly();
 
     /// <summary>
-    /// The remaining split as text, for the totals bar's remaining segment and the folded
-    /// remaining heading, or null when there is nothing to say.
+    /// The folded sections' texts, which the window and the HTML report both show.
     /// </summary>
-    public string? RemainingBreakdownText { get; private set; }
-
-    /// <summary>
-    /// The remaining time's largest entry and its time, for the folded remaining heading, or
-    /// null when there are no entries.
-    /// </summary>
-    public string? LargestRemainingEntryText { get; private set; }
-
-    /// <summary>
-    /// The base game's largest steps as text, for the totals bar's base-game segment and the
-    /// folded base-game heading, or null when it has no steps.
-    /// </summary>
-    public string? BaseGameBreakdownText { get; private set; }
-
-    /// <summary>
+    /// <param name="BaseGameBreakdown">
+    /// The base game's largest steps, for the totals bar's base-game segment and the folded
+    /// base-game heading, or null when it has no steps.
+    /// </param>
+    /// <param name="LargestBaseGameStep">
     /// The base game's largest step and its time, for the folded base-game heading, or null
     /// when it has no steps.
-    /// </summary>
-    public string? LargestBaseGameStepText { get; private set; }
-
-    private readonly Dictionary<string, string> totalsTooltipDetails = [];
+    /// </param>
+    /// <param name="RemainingBreakdown">
+    /// The remaining split, for the totals bar's remaining segment and the folded remaining
+    /// heading, or null when there is nothing to say.
+    /// </param>
+    /// <param name="LargestRemainingEntry">
+    /// The remaining time's largest entry and its time, for the folded remaining heading, or
+    /// null when there are no entries.
+    /// </param>
+    /// <param name="TotalsTooltipDetails">
+    /// What the totals bar's segments add to their tooltips: the two breakdowns, keyed by the
+    /// segment's category.
+    /// </param>
+    internal sealed record SectionTexts(
+        string? BaseGameBreakdown,
+        string? LargestBaseGameStep,
+        string? RemainingBreakdown,
+        string? LargestRemainingEntry,
+        IReadOnlyDictionary<string, string> TotalsTooltipDetails
+    );
 
     /// <summary>
-    /// What the totals bar's segments add to their tooltips: the base game's largest steps
-    /// and the remaining time by stage.
+    /// The folded sections' texts, with their times written as <paramref name="secondsOnly"/>
+    /// asks. The window passes the setting as it draws and the HTML report the value it
+    /// writes, so the texts match the times beside them. They are built again only when that
+    /// changes.
     /// </summary>
-    public IReadOnlyDictionary<string, string> TotalsTooltipDetails =>
-        totalsTooltipDetails.AsReadOnly();
+    internal SectionTexts Texts(bool secondsOnly)
+    {
+        if (texts == null || textsSecondsOnly != secondsOnly)
+        {
+            texts = BuildTexts(secondsOnly);
+            textsSecondsOnly = secondsOnly;
+        }
+        return texts;
+    }
+
+    private SectionTexts BuildTexts(bool secondsOnly)
+    {
+        string? baseGameBreakdown = null;
+        string? largestBaseGameStep = null;
+        if (baseGameSteps.Count > 0)
+        {
+            baseGameBreakdown = Breakdown(
+                "LoadingProgress.StartupImpact.Nonmods.BySteps".Translate().ToString(),
+                baseGameSteps,
+                secondsOnly
+            );
+            largestBaseGameStep = LineText(baseGameSteps[0], secondsOnly);
+        }
+
+        string? remainingBreakdown = null;
+        string? largestRemainingEntry = null;
+        if (remainingByStage.Count > 0)
+        {
+            List<(string Label, float Ms)> lines =
+            [
+                .. remainingByStage.Select(entry => (entry.Label, entry.Ms)),
+            ];
+            remainingBreakdown = Breakdown(
+                "LoadingProgress.StartupImpact.Remaining.ByStage".Translate().ToString(),
+                lines,
+                secondsOnly
+            );
+            largestRemainingEntry = LineText(lines[0], secondsOnly);
+        }
+
+        Dictionary<string, string> details = [];
+        if (baseGameBreakdown != null)
+        {
+            details["LoadingProgress.StartupImpact.Total.BaseGame"] = baseGameBreakdown;
+        }
+        if (remainingBreakdown != null)
+        {
+            details["LoadingProgress.StartupImpact.Total.Others"] = remainingBreakdown;
+        }
+        return new(
+            baseGameBreakdown,
+            largestBaseGameStep,
+            remainingBreakdown,
+            largestRemainingEntry,
+            details
+        );
+    }
+
+    private static string LineText((string Label, float Ms) line, bool secondsOnly) =>
+        $"{line.Label}: {ProfilerBar.TimeText(line.Ms, secondsOnly)}";
 
     /// <summary>
     /// The steps with time in them, largest first, at most <paramref name="count"/> of them.
@@ -187,31 +255,21 @@ internal sealed class StartupImpactSessionViewData
                 .Take(count),
         ];
 
-    private void RebuildTooltipDetails()
-    {
-        totalsTooltipDetails.Clear();
-        if (BaseGameBreakdownText != null)
-        {
-            totalsTooltipDetails["LoadingProgress.StartupImpact.Total.BaseGame"] =
-                BaseGameBreakdownText;
-        }
-        if (RemainingBreakdownText != null)
-        {
-            totalsTooltipDetails["LoadingProgress.StartupImpact.Total.Others"] =
-                RemainingBreakdownText;
-        }
-    }
-
     /// <summary>
     /// A breakdown as tooltip text: the header, then up to <see cref="BreakdownLines"/> lines,
-    /// largest first, and how many more there are when that leaves some out.
+    /// largest first, and how many more there are when that leaves some out. Times are written
+    /// as <paramref name="secondsOnly"/> asks.
     /// </summary>
-    internal static string Breakdown(string header, IReadOnlyList<(string Label, float Ms)> lines)
+    internal static string Breakdown(
+        string header,
+        IReadOnlyList<(string Label, float Ms)> lines,
+        bool secondsOnly
+    )
     {
         var sb = new StringBuilder(header);
-        foreach (var (label, ms) in lines.Take(BreakdownLines))
+        foreach (var line in lines.Take(BreakdownLines))
         {
-            _ = sb.Append('\n').Append(label).Append(": ").Append(ProfilerBar.TimeText(ms));
+            _ = sb.Append('\n').Append(LineText(line, secondsOnly));
         }
         if (lines.Count > BreakdownLines)
         {
@@ -324,7 +382,6 @@ internal sealed class StartupImpactSessionViewData
             categoriesMods.Add(name);
             metricsMods.Add(modView.ModData.TotalImpact);
         }
-        RebuildTooltipDetails();
     }
 
     public void CalculateBaseGameStats()
@@ -362,24 +419,14 @@ internal sealed class StartupImpactSessionViewData
 
         OffThreadBasegameLoadingTime = sessionData.OffThreadTotalImpact;
 
-        BaseGameBreakdownText = null;
-        LargestBaseGameStepText = null;
-        List<(string Label, float Ms)> steps =
-        [
-            .. LargestSteps(categoriesNonMods, metricsNonMods, int.MaxValue)
+        baseGameSteps.Clear();
+        baseGameSteps.AddRange(
+            LargestSteps(categoriesNonMods, metricsNonMods, int.MaxValue)
                 .Select(step =>
                     (StartupImpactProfilerUtil.TranslateCategory(step.Category), step.Ms)
-                ),
-        ];
-        if (steps.Count > 0)
-        {
-            BaseGameBreakdownText = Breakdown(
-                "LoadingProgress.StartupImpact.Nonmods.BySteps".Translate().ToString(),
-                steps
-            );
-            LargestBaseGameStepText = $"{steps[0].Label}: {ProfilerBar.TimeText(steps[0].Ms)}";
-        }
-        RebuildTooltipDetails();
+                )
+        );
+        texts = null;
     }
 
     private void CalculateRemainingByStage()
@@ -388,8 +435,7 @@ internal sealed class StartupImpactSessionViewData
         categoriesRemaining.Clear();
         metricsRemaining.Clear();
         categoryColorsRemaining.Clear();
-        RemainingBreakdownText = null;
-        LargestRemainingEntryText = null;
+        texts = null;
 
         remainingByStage.AddRange(
             RemainingEntries(
@@ -410,14 +456,6 @@ internal sealed class StartupImpactSessionViewData
             metricsRemaining.Add(entry.Ms);
             categoryColorsRemaining[entry.Label] = StartupImpactProfilerUtil.HashColor(entry.Key);
         }
-
-        RemainingBreakdownText = Breakdown(
-            "LoadingProgress.StartupImpact.Remaining.ByStage".Translate().ToString(),
-            [.. remainingByStage.Select(entry => (entry.Label, entry.Ms))]
-        );
-        var largest = remainingByStage[0];
-        LargestRemainingEntryText = $"{largest.Label}: {ProfilerBar.TimeText(largest.Ms)}";
-        RebuildTooltipDetails();
     }
 
     /// <summary>

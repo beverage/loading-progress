@@ -54,15 +54,17 @@ internal static class StartupImpactHtmlExporter
         AppendNumber(sb, "remainingMs", viewData.RemainingLoadingTime);
         _ = sb.Append(',');
 
-        // The folded sections' texts as the window has them. None depends on which mods are
-        // hidden, so the report shows them as they are.
-        AppendString(sb, "baseGameBreakdownText", viewData.BaseGameBreakdownText);
+        // The folded sections' texts as the window has them, with times written as the report
+        // writes its own. None depends on which mods are hidden, so the report shows them as
+        // they are.
+        var texts = viewData.Texts(secondsOnly);
+        AppendString(sb, "baseGameBreakdownText", texts.BaseGameBreakdown);
         _ = sb.Append(',');
-        AppendString(sb, "largestBaseGameStepText", viewData.LargestBaseGameStepText);
+        AppendString(sb, "largestBaseGameStepText", texts.LargestBaseGameStep);
         _ = sb.Append(',');
-        AppendString(sb, "remainingBreakdownText", viewData.RemainingBreakdownText);
+        AppendString(sb, "remainingBreakdownText", texts.RemainingBreakdown);
         _ = sb.Append(',');
-        AppendString(sb, "largestRemainingEntryText", viewData.LargestRemainingEntryText);
+        AppendString(sb, "largestRemainingEntryText", texts.LargestRemainingEntry);
         _ = sb.Append(',');
 
         AppendKey(sb, "secondsOnly");

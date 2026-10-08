@@ -18,13 +18,20 @@ internal sealed class StartupImpactHtmlExporterTests
     );
 
     private static string Report(StartupImpactSessionViewData viewData) =>
+        Report(Session, viewData, secondsOnly: false);
+
+    private static string Report(
+        StartupImpactSessionData session,
+        StartupImpactSessionViewData viewData,
+        bool secondsOnly
+    ) =>
         StartupImpactHtmlExporter.BuildReport(
-            Session,
+            session,
             viewData,
             new Dictionary<string, Color>(),
             Color.gray,
             showBaseGameOffThreadImpact: true,
-            secondsOnly: false
+            secondsOnly
         );
 
     // The report carries the remaining bar's segments, each with its colour and time, and the
@@ -100,21 +107,7 @@ internal sealed class StartupImpactHtmlExporterTests
         var viewData = new StartupImpactSessionViewData(Session);
         var html = Report(viewData);
 
-        foreach (
-            var (key, text) in new[]
-            {
-                ("baseGameBreakdownText", viewData.BaseGameBreakdownText),
-                ("largestBaseGameStepText", viewData.LargestBaseGameStepText),
-                ("remainingBreakdownText", viewData.RemainingBreakdownText),
-                ("largestRemainingEntryText", viewData.LargestRemainingEntryText),
-            }
-        )
-        {
-            Expect.IsNotNull(text);
-            Expect.IsTrue(
-                html.Contains($"\"{key}\":\"{Escaped(text!)}\",", StringComparison.Ordinal)
-            );
-        }
+        ExpectTexts(html, viewData.Texts(secondsOnly: false));
         foreach (
             var (key, ms) in new[]
             {
@@ -125,6 +118,52 @@ internal sealed class StartupImpactHtmlExporterTests
         {
             var value = ms.ToString("0.###", CultureInfo.InvariantCulture);
             Expect.IsTrue(html.Contains($"\"{key}\":{value},", StringComparison.Ordinal));
+        }
+    }
+
+    // The report writes the section texts as it writes its own times: a report exported with
+    // the seconds-only setting on used to carry them as the window had them when it opened.
+    [Test]
+    public static void TheReportWritesItsSectionTextsAsItWritesItsTimes()
+    {
+        // A step and a stage's remaining time of over a minute, which the two ways of writing
+        // times write differently.
+        var session = StartupImpactSessionData.FromValues(
+            100000f,
+            0f,
+            new() { ["LoadingProgress.StartupImpact.GarbageCollection"] = 62300f },
+            [],
+            [new("LoadingDefs", 80000f, 17700f)]
+        );
+        var viewData = new StartupImpactSessionViewData(session);
+        Expect.AreNotEqual(
+            viewData.Texts(secondsOnly: true).LargestRemainingEntry,
+            viewData.Texts(secondsOnly: false).LargestRemainingEntry
+        );
+
+        foreach (var secondsOnly in new[] { true, false })
+        {
+            ExpectTexts(Report(session, viewData, secondsOnly), viewData.Texts(secondsOnly));
+        }
+    }
+
+    // The report carries each of the section texts as it is.
+    private static void ExpectTexts(string html, StartupImpactSessionViewData.SectionTexts texts)
+    {
+        foreach (
+            var (key, text) in new[]
+            {
+                ("baseGameBreakdownText", texts.BaseGameBreakdown),
+                ("largestBaseGameStepText", texts.LargestBaseGameStep),
+                ("remainingBreakdownText", texts.RemainingBreakdown),
+                ("largestRemainingEntryText", texts.LargestRemainingEntry),
+            }
+        )
+        {
+            Expect.IsNotNull(text);
+            Expect.IsTrue(
+                html.Contains($"\"{key}\":\"{Escaped(text!)}\",", StringComparison.Ordinal)
+            );
         }
     }
 

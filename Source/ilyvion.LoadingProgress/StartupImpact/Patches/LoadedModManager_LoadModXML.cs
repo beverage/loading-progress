@@ -9,13 +9,14 @@ internal static class LoadedModManager_LoadModXML
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
     internal static IEnumerable<CodeInstruction> Transpiler(
         IEnumerable<CodeInstruction> instructions,
-        ILGenerator generator
+        ILGenerator generator,
+        MethodBase original
     )
 #pragma warning restore CA1859 // Use concrete types when possible for improved performance
     {
-        var original = instructions.ToList();
+        var unpatched = instructions.ToList();
 
-        var codeMatcher = new CodeMatcher(original, generator);
+        var codeMatcher = new CodeMatcher(unpatched, generator);
 
         _ = codeMatcher.SearchForward(i =>
             i.Calls(AccessTools.Method(typeof(ModContentPack), nameof(ModContentPack.LoadDefs)))
@@ -25,18 +26,19 @@ internal static class LoadedModManager_LoadModXML
             LoadingProgressMod.Error(
                 "LoadedModManager.LoadModXML: Could not find a call to ModContentPack.LoadDefs."
             );
-            return original;
+            return unpatched;
         }
 
         // The call's arguments are the mod and hotReload, so the instruction two before it
-        // loads the mod.
+        // loads the mod, from a local of the mod's type. Another mod's transpiler could leave
+        // something else there, and passing that on as the mod would break the method.
         var loadMod = codeMatcher.InstructionAt(-2);
-        if (!loadMod.IsLdloc())
+        if (LocalTypeLoaded(loadMod, original) != typeof(ModContentPack))
         {
             LoadingProgressMod.Error(
                 "LoadedModManager.LoadModXML: Could not find the mod ModContentPack.LoadDefs is called on."
             );
-            return original;
+            return unpatched;
         }
 
         // The call stays where other mods' transpilers look for it. The defs it returns are
@@ -52,6 +54,30 @@ internal static class LoadedModManager_LoadModXML
             ]);
 
         return codeMatcher.Instructions();
+    }
+
+    /// <summary>
+    /// The type of the local <paramref name="instruction"/> loads, one of
+    /// <paramref name="method"/>'s own or one a transpiler declared, or null when it loads no
+    /// local.
+    /// </summary>
+    internal static Type? LocalTypeLoaded(CodeInstruction instruction, MethodBase method)
+    {
+        if (!instruction.IsLdloc())
+        {
+            return null;
+        }
+        if (instruction.operand is LocalVariableInfo local)
+        {
+            return local.LocalType;
+        }
+
+        // The short forms carry no operand: the index is in the opcode.
+        var index = instruction.LocalIndex();
+        var locals = method.GetMethodBody()?.LocalVariables;
+        return locals != null && index >= 0 && index < locals.Count
+            ? locals[index].LocalType
+            : null;
     }
 
     /// <summary>

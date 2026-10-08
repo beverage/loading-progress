@@ -90,6 +90,38 @@ internal sealed class ProfilerTests
         Expect.GreaterThanOrEqualTo(inner, 19f);
     }
 
+    // The profiler records the open category's time before it opens the new one. In the other
+    // order, a start whose recording throws would leave the new category open with no stop
+    // coming for it, and the open category's stop would close and record it instead, with a
+    // mismatch error. TheOpenCategoryStaysOnTopUntilTheNewOneIsPushed checks the halves the
+    // start is made of; this checks the start itself.
+    [Test]
+    public static IEnumerator AStartWhoseRecordingThrowsOpensNothing()
+    {
+        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        {
+            Test.Skip(TestStartup.TrackingOff);
+            yield break;
+        }
+
+        // A recording reaches the live session's stage ledger, where it is made to throw.
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
+        }
+
+        using var profiler = new Profiler("test");
+        profiler.Start("outer");
+        RecordingFailure.During(() =>
+            _ = Expect.Throws<InvalidOperationException>(() => profiler.Start("inner"))
+        );
+        _ = profiler.Stop("outer");
+
+        Expect.IsTrue(profiler.Metrics.ContainsKey("outer"));
+        Expect.IsFalse(profiler.Metrics.ContainsKey("inner"));
+    }
+
     // The timing patches closed their categories in postfixes, which do not run when the
     // method throws, and the engine goes on loading after a mod constructor that throws. The
     // category stayed open, and each later start on that mod's timer credited it with the

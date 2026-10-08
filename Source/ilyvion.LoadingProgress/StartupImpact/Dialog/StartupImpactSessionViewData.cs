@@ -92,17 +92,33 @@ internal sealed class StartupImpactSessionViewData
     public float TotalWindow { get; private set; }
 
     /// <summary>
-    /// The remaining part of the startup time: what is left of the window once the mods,
-    /// hidden or not, and the base game have had theirs. The totals bar's last segment.
+    /// The remaining part of the startup time, the part no category timed: see
+    /// <see cref="RemainingTotal"/>. The totals bar's last segment, the remaining heading's
+    /// total and what the remaining bar spans.
     /// </summary>
     public float RemainingLoadingTime =>
         metricsTotal.Count == CategoriesTotal.Length ? metricsTotal[^1] : 0f;
 
     /// <summary>
-    /// What the remaining bar spans: the remaining total, or the sum of its entries when the
-    /// stages add up to more, since the two are measured separately and can differ a little.
+    /// The remaining time: what its entries add up to, for a session that kept its stages;
+    /// for one saved before stages were kept, what is left of <paramref name="window"/> once
+    /// the mods, hidden or not, and the base game have had their
+    /// <paramref name="timedTotal"/>.
     /// </summary>
-    public float RemainingBarSpan => Math.Max(RemainingLoadingTime, metricsRemaining.Sum());
+    /// <remarks>
+    /// The two differ by the time categories on two timers both cover, as a mod's
+    /// <c>TryRegister</c> does inside the base game's <c>ParseAndProcessXML</c>. The mod's
+    /// total and the base game's each count it, while the stage ledger credits it once, so
+    /// the entries hold all the time no category timed and the window's leftover falls short
+    /// of it by the shared time. The totals bar's segments then come to that much more than
+    /// the window.
+    /// </remarks>
+    internal static float RemainingTotal(
+        bool stagesKept,
+        IEnumerable<float> entries,
+        float window,
+        float timedTotal
+    ) => stagesKept ? entries.Sum() : Math.Max(0f, window - timedTotal);
 
     /// <summary>
     /// What the base game's bars span: with the off-thread bar shown, the longer of its time
@@ -214,9 +230,10 @@ internal sealed class StartupImpactSessionViewData
         this.sessionData = sessionData;
         modViewData = [.. sessionData.Mods.Select(mod => new StartupImpactSessionModViewData(mod))];
 
+        // The remaining entries come before the totals, which take the remaining time from them.
         CalculateBaseGameStats();
-        CalculateModStats();
         CalculateRemainingByStage();
+        CalculateModStats();
 
         foreach (var modView in modViewData)
         {
@@ -284,7 +301,12 @@ internal sealed class StartupImpactSessionViewData
             ModsLoadingTime,
             hiddenModsLoadingTime,
             BasegameLoadingTime,
-            Math.Max(0, TotalWindow - totalLoadingTime),
+            RemainingTotal(
+                sessionData.StageTimings.Count > 0,
+                metricsRemaining,
+                TotalWindow,
+                totalLoadingTime
+            ),
         ]);
 
         categoriesMods.Clear();

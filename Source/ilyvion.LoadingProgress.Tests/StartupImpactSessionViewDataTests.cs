@@ -92,9 +92,9 @@ internal sealed class StartupImpactSessionViewDataTests
     }
 
     // The bar as the window draws it, from this startup's own session: every entry a segment
-    // with a colour, largest first, on a span that holds the remaining total.
+    // with a colour, largest first, and the remaining total, which the bar spans, their sum.
     [Test]
-    public static void TheRemainingBarCarriesEveryEntryLargestFirstOnASpanHoldingTheTotal()
+    public static void TheRemainingBarCarriesEveryEntryLargestFirstAndTheTotalIsTheirSum()
     {
         var viewData = new StartupImpactSessionViewData(
             StartupImpactSessionData.FromCurrentSession()
@@ -110,8 +110,38 @@ internal sealed class StartupImpactSessionViewDataTests
         {
             Expect.IsTrue(viewData.MetricsRemaining[i] <= viewData.MetricsRemaining[i - 1]);
         }
-        Expect.GreaterThanOrEqualTo(viewData.RemainingBarSpan, viewData.RemainingLoadingTime);
-        Expect.GreaterThanOrEqualTo(viewData.RemainingBarSpan, viewData.MetricsRemaining.Sum());
+        Expect.AreApproximatelyEqual(
+            viewData.MetricsRemaining.Sum(),
+            viewData.RemainingLoadingTime
+        );
+    }
+
+    // A session saved before stages were kept has no entries to add up, so its remaining time
+    // is what the window leaves once the timed steps have had theirs, and never less than none.
+    [Test]
+    public static void ASessionWithoutStagesTakesWhatTheWindowLeaves()
+    {
+        Expect.AreApproximatelyEqual(
+            3000f,
+            StartupImpactSessionViewData.RemainingTotal(false, [], 10000f, 7000f)
+        );
+        Expect.AreApproximatelyEqual(
+            0f,
+            StartupImpactSessionViewData.RemainingTotal(false, [], 7000f, 9000f)
+        );
+        Expect.AreApproximatelyEqual(
+            1500f,
+            StartupImpactSessionViewData.RemainingTotal(true, [1000f, 500f], 10000f, 7000f)
+        );
+    }
+
+    // The top bar's segments can come to more than the startup time, by time two totals share.
+    // A linear bar is drawn to its segments' total then, instead of past its end.
+    [Test]
+    public static void ALinearBarWhoseSegmentsComeToMoreThanItsSpanIsDrawnToThem()
+    {
+        Expect.AreApproximatelyEqual(11000f, ProfilerBar.LinearSpan(10000f, 11000f));
+        Expect.AreApproximatelyEqual(10000f, ProfilerBar.LinearSpan(10000f, 9000f));
     }
 
     // The base game's two bars are drawn against the longer of the two totals, so an

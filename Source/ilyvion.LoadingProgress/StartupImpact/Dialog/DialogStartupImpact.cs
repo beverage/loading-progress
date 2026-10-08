@@ -1098,7 +1098,7 @@ internal sealed class DialogStartupImpact : Window
             barRect,
             _sessionViewData.MetricsRemaining,
             _sessionViewData.CategoriesRemaining,
-            _sessionViewData.RemainingBarSpan,
+            _sessionViewData.RemainingLoadingTime,
             _sessionViewData.CategoryColorsRemaining,
             translateCategories: false
         );

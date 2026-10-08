@@ -36,8 +36,9 @@ internal sealed class StartupImpactSessionTotalsTests
         var viewData = new StartupImpactSessionViewData(session);
 
         Expect.AreApproximatelyEqual(110600f, viewData.TotalWindow);
-        // What the mod and the base game do not account for, measured to the menu.
-        Expect.AreApproximatelyEqual(110600f - 50000f - 20000f, viewData.MetricsTotal[3]);
+        // What no category timed, measured to the menu: the loading stage's second and the
+        // 14.1 s after loading.
+        Expect.AreApproximatelyEqual(1000f + 14100f, viewData.MetricsTotal[3]);
         // The stored loading time is the clock stop, which external tools read; it is left
         // as it was.
         Expect.AreApproximatelyEqual(90600f, session.LoadingTime);
@@ -53,7 +54,8 @@ internal sealed class StartupImpactSessionTotalsTests
         var viewData = new StartupImpactSessionViewData(Session(0f));
 
         Expect.AreApproximatelyEqual(90600f + 5900f, viewData.TotalWindow);
-        Expect.AreApproximatelyEqual(90600f - 14100f - 50000f, viewData.MetricsTotal[3]);
+        // The loading stage's untimed second.
+        Expect.AreApproximatelyEqual(1000f, viewData.MetricsTotal[3]);
     }
 
     // The history used to list a session by its loading time or its time to the menu, while
@@ -80,8 +82,42 @@ internal sealed class StartupImpactSessionTotalsTests
         var viewData = new StartupImpactSessionViewData(session);
 
         Expect.AreApproximatelyEqual(70000f, viewData.TotalWindow);
-        Expect.AreApproximatelyEqual(0f, viewData.MetricsTotal[3]);
+        // The loading stage's untimed second, however much of the window the steps took.
+        Expect.AreApproximatelyEqual(1000f, viewData.MetricsTotal[3]);
         Expect.AreApproximatelyEqual(60000f, session.LoadingTime);
+    }
+
+    // A mod's category that ran inside one of the base game's counts in both their totals,
+    // while the stage ledger credits the shared second once. The remaining heading used to
+    // take the window less both totals, a second short of the entries listed under it.
+    [Test]
+    public static void TheRemainingTimeCountsTimeTwoTotalsShareOnce()
+    {
+        var viewData = new StartupImpactSessionViewData(
+            StartupImpactSessionData.FromValues(
+                10000f,
+                0f,
+                new() { [ClearCache] = 6000f },
+                [
+                    StartupImpactSessionModData.FromValues(
+                        "A",
+                        "test.a",
+                        new() { ["LoadingProgress.StartupImpact.ModConstructor"] = 3000f },
+                        []
+                    ),
+                ],
+                [new("LoadingDefs", 10000f, 8000f)]
+            )
+        );
+
+        Expect.AreApproximatelyEqual(2000f, viewData.RemainingLoadingTime);
+        Expect.AreApproximatelyEqual(
+            viewData.MetricsRemaining.Sum(),
+            viewData.RemainingLoadingTime
+        );
+        Expect.AreApproximatelyEqual(2000f, viewData.MetricsTotal[3]);
+        // The top bar's segments come to the window and the shared second.
+        Expect.AreApproximatelyEqual(viewData.TotalWindow + 1000f, viewData.MetricsTotal.Sum());
     }
 
     // The 5.9 s event after loading has an owner; only the rest of the 20 s is remaining.

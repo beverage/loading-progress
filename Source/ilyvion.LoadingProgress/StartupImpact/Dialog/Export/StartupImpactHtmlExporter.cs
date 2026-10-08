@@ -53,8 +53,6 @@ internal static class StartupImpactHtmlExporter
         _ = sb.Append(',');
         AppendNumber(sb, "remainingMs", viewData.RemainingLoadingTime);
         _ = sb.Append(',');
-        AppendNumber(sb, "remainingBarSpanMs", viewData.RemainingBarSpan);
-        _ = sb.Append(',');
 
         // The folded sections' texts as the window has them. None depends on which mods are
         // hidden, so the report shows them as they are.
@@ -1313,7 +1311,7 @@ internal static class StartupImpactHtmlExporter
     document.getElementById("remainingDetail").textContent = DATA.largestRemainingEntryText || "";
     document.getElementById("remainingSection").style.display = "";
     var bar = document.getElementById("remainingBar");
-    renderBar(bar, DATA.remainingByStage, DATA.remainingBarSpanMs);
+    renderBar(bar, DATA.remainingByStage, DATA.remainingMs);
   }
 
   function renderAll() {

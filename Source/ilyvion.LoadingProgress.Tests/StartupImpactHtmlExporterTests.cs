@@ -120,7 +120,6 @@ internal sealed class StartupImpactHtmlExporterTests
             {
                 ("windowMs", viewData.TotalWindow),
                 ("remainingMs", viewData.RemainingLoadingTime),
-                ("remainingBarSpanMs", viewData.RemainingBarSpan),
             }
         )
         {

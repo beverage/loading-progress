@@ -120,7 +120,7 @@ internal sealed class ProfilerBar
             DrawLinearScale(
                 metrics,
                 categories,
-                maxImpact,
+                LinearSpan(maxImpact, sumLinear),
                 categoryColors,
                 innerX,
                 innerY,
@@ -291,6 +291,18 @@ internal sealed class ProfilerBar
             GUI.color = stored;
         }
     }
+
+    /// <summary>
+    /// What a linear bar's full width stands for: <paramref name="span"/>, or the segments'
+    /// <paramref name="segmentsTotal"/> when they come to more, so the bar never runs past its
+    /// rect. The log scale caps its fill instead.
+    /// </summary>
+    /// <remarks>
+    /// The totals bar's segments can come to a little more than the startup time: see
+    /// <see cref="Dialog.StartupImpactSessionViewData.RemainingTotal"/>.
+    /// </remarks>
+    internal static float LinearSpan(float span, float segmentsTotal) =>
+        Math.Max(span, segmentsTotal);
 
     /// <summary>
     /// Applies a log scaling transformation to the input value x, using tau as the scaling parameter.

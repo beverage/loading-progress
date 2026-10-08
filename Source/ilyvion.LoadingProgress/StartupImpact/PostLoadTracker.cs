@@ -301,7 +301,6 @@ internal static class PostLoadTracker
                 }
                 catch (Exception e)
                 {
-                    ForgetCurrent();
                     LoadingProgressMod.Warning(
                         $"Could not go on timing the current event after its deferred actions, so the rest of it is untimed: {e.Message}"
                     );
@@ -479,12 +478,18 @@ internal static class PostLoadTracker
     /// Starts timing <paramref name="queuedEvent"/> as the current event, under the mod whose
     /// code it runs.
     /// </summary>
+    /// <remarks>
+    /// The event becomes the current one first, and its category is kept only once its timing
+    /// has started. An event whose start throws therefore stays current, untimed: it is not
+    /// tried again on every frame, and nothing is stopped for it.
+    /// </remarks>
     internal static void StartCurrent(LongEventHandler.QueuedLongEvent queuedEvent)
     {
         _current = queuedEvent;
-        _currentCategory = $"{Category}|{Describe(queuedEvent)}";
-        _currentOwner = OwnerOf(queuedEvent, out _currentIsBaseGame);
-        StartTiming(_currentOwner, _currentIsBaseGame, _currentCategory);
+        var category = $"{Category}|{Describe(queuedEvent)}";
+        var owner = OwnerOf(queuedEvent, out var isBaseGame);
+        StartTiming(owner, isBaseGame, category);
+        (_currentOwner, _currentIsBaseGame, _currentCategory) = (owner, isBaseGame, category);
     }
 
     /// <summary>
@@ -500,18 +505,22 @@ internal static class PostLoadTracker
 
     /// <summary>
     /// Stops timing the current event, taking <paramref name="discountMs"/>, time the game sat
-    /// paused, back off. The event is no longer the current one even when stopping throws.
+    /// paused, back off. The event is no longer the current one even when stopping throws, and
+    /// one whose timing never started is let go with nothing stopped.
     /// </summary>
     internal static void StopCurrent(float discountMs)
     {
-        if (_current == null || _currentCategory == null)
+        if (_current == null)
         {
             return;
         }
 
         var (owner, isBaseGame, category) = (_currentOwner, _currentIsBaseGame, _currentCategory);
         ForgetCurrent();
-        StartupImpactProfilerUtil.Stop(owner, isBaseGame, category, discountMs);
+        if (category != null)
+        {
+            StartupImpactProfilerUtil.Stop(owner, isBaseGame, category, discountMs);
+        }
     }
 
     private static void ForgetCurrent()

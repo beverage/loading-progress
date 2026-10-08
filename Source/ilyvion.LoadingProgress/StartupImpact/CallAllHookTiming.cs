@@ -299,8 +299,10 @@ internal sealed class CallAllHookTiming
     // Does nothing: patching the target with it is what rebuilds the target's replacement.
     private static void NoOpPrefix() { }
 
-    private static void Prefix(MethodBase __originalMethod)
+    // Hands the finalizer whether the hook's category was started.
+    private static void Prefix(MethodBase __originalMethod, out bool __state)
     {
+        __state = false;
         if (!_timed.TryGetValue(__originalMethod, out var timed))
         {
             return;
@@ -308,31 +310,46 @@ internal sealed class CallAllHookTiming
 
         if (_depth++ == 0 && BaseCategory is { } paused)
         {
-            Quietly(() => StartupImpactProfilerUtil.StopBaseGameProfiler(paused));
+            _ = Quietly(() => StartupImpactProfilerUtil.StopBaseGameProfiler(paused));
         }
-        Quietly(() => StartupImpactProfilerUtil.StartModProfiler(timed.Mod, timed.Category));
+        __state = Quietly(() =>
+            StartupImpactProfilerUtil.StartModProfiler(timed.Mod, timed.Category)
+        );
     }
 
-    private static Exception? Finalizer(Exception? __exception, MethodBase __originalMethod)
+    // Stops the hook's category only if the prefix started it: a start that threw opened
+    // nothing, and a stop would close whatever category the mod had open below it.
+    private static Exception? Finalizer(
+        Exception? __exception,
+        MethodBase __originalMethod,
+        bool __state
+    )
     {
         if (_timed.TryGetValue(__originalMethod, out var timed))
         {
-            Quietly(() => StartupImpactProfilerUtil.StopModProfiler(timed.Mod, timed.Category));
+            if (__state)
+            {
+                _ = Quietly(() =>
+                    StartupImpactProfilerUtil.StopModProfiler(timed.Mod, timed.Category)
+                );
+            }
             if (--_depth == 0 && BaseCategory is { } paused)
             {
-                Quietly(() => StartupImpactProfilerUtil.StartBaseGameProfiler(paused));
+                _ = Quietly(() => StartupImpactProfilerUtil.StartBaseGameProfiler(paused));
             }
         }
         return __exception;
     }
 
     // The prefix and finalizer run inside other mods' hooks, so nothing in them may throw into
-    // one: a failure is logged once, and the hook and the call go on.
-    private static void Quietly(Action step)
+    // one: a failure is logged once, and the hook and the call go on. Returns whether the step
+    // ran without throwing.
+    private static bool Quietly(Action step)
     {
         try
         {
             step();
+            return true;
         }
         catch (Exception e)
         {
@@ -343,6 +360,7 @@ internal sealed class CallAllHookTiming
                     $"Timing a hook on the static constructor pass failed, so some hook time may sit under the wrong heading: {e.Message}"
                 );
             }
+            return false;
         }
     }
 }

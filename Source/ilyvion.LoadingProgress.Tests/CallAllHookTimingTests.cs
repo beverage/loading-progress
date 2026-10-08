@@ -366,6 +366,62 @@ internal sealed class CallAllHookTimingTests
         }
     }
 
+    // A hook's start that throws while recording a category the mod has open below it has
+    // opened nothing. The finalizer used to stop the hook's category anyway, which stopped the
+    // open one in its place, and the test's own stop of that category then found it gone.
+    // Either stop logs an error, which fails the test.
+    [Test]
+    [WarningsAllowed("Timing a hook on the static constructor pass failed")]
+    public static IEnumerator AHookWhoseTimingFailsToStartHasNothingStopped()
+    {
+        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        {
+            Test.Skip(TestStartup.TrackingOff);
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
+        }
+
+        const string Open = "LoadingProgress.Tests.CallAllHookTiming.Open";
+        var mod = OwnMod();
+        var info = OwnModInfo();
+        Expect.IsNotNull(info);
+        var harmony = new Harmony(TestHarmonyId);
+        _ = harmony.Patch(
+            TargetMethod,
+            postfix: new HarmonyMethod(typeof(CallAllHookTimingTests), nameof(SlowPostfix))
+        );
+        var timing = CallAllHookTiming.Install(TargetMethod);
+        StartupImpactProfilerUtil.StartModProfiler(mod, Open);
+        var openStopped = false;
+        try
+        {
+            RecordingFailure.During(Target);
+            StartupImpactProfilerUtil.StopModProfiler(mod, Open);
+            openStopped = true;
+
+            Expect.IsTrue(info!.Profiler.Metrics.ContainsKey(Open));
+            Expect.IsFalse(
+                info.Profiler.Metrics.ContainsKey($"{HookCategoryPrefix}{nameof(SlowPostfix)}")
+            );
+        }
+        finally
+        {
+            if (!openStopped)
+            {
+                StartupImpactProfilerUtil.StopModProfiler(mod, Open);
+            }
+            timing.Remove();
+            harmony.UnpatchAll(harmony.Id);
+            ForgetTestTime();
+            TestStartup.Forget(info!.Profiler, Open);
+        }
+    }
+
     // Times one call of the target under the test's own base-game category, the way the
     // startup times the engine's pass, with the timing patches on for the call only.
     private static void TimedCall(Action? call = null)

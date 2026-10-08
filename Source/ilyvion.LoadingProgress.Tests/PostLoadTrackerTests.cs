@@ -251,6 +251,63 @@ internal sealed class PostLoadTrackerTests
         }
     }
 
+    // A start that throws while recording the category open below it has opened nothing. The
+    // event used to keep its category anyway, so stopping it stopped the open category in its
+    // place, and the test's own stop of that category then found it gone. Either stop logs an
+    // error, which fails the test.
+    [Test]
+    public static IEnumerator AnEventWhoseTimingFailsToStartHasNothingStopped()
+    {
+        if (!LoadingProgressMod.Settings.TrackStartupLoadingImpact)
+        {
+            Test.Skip(TestStartup.TrackingOff);
+            yield break;
+        }
+
+        var framesWaited = 0;
+        while (TestStartup.StillStartingUp(ref framesWaited))
+        {
+            yield return null;
+        }
+
+        const string Open = "LoadingProgress.Tests.PostLoadTrackerTests.Open";
+        var profiler = LoadingProgressMod.instance.StartupImpact.BaseGameProfiler;
+        // Never run: only the code it names decides whose timer the event is on.
+        var queuedEvent = new LongEventHandler.QueuedLongEvent
+        {
+            eventAction = Log.ResetMessageCount,
+            eventTextKey = $"{nameof(PostLoadTrackerTests)}.Failed",
+        };
+        var category = $"{PostLoadTracker.Category}|{PostLoadTracker.Describe(queuedEvent)}";
+        StartupImpactProfilerUtil.StartBaseGameProfiler(Open);
+        var openStopped = false;
+        try
+        {
+            RecordingFailure.During(() =>
+                _ = Expect.Throws<InvalidOperationException>(() =>
+                    PostLoadTracker.StartCurrent(queuedEvent)
+                )
+            );
+            PostLoadTracker.StopCurrent(0f);
+            StartupImpactProfilerUtil.StopBaseGameProfiler(Open);
+            openStopped = true;
+
+            Expect.IsTrue(profiler.Metrics.ContainsKey(Open));
+            Expect.IsFalse(profiler.Metrics.ContainsKey(category));
+        }
+        finally
+        {
+            // Nothing else is current once the startup has ended.
+            PostLoadTracker.StopCurrent(0f);
+            if (!openStopped)
+            {
+                StartupImpactProfilerUtil.StopBaseGameProfiler(Open);
+            }
+            TestStartup.Forget(profiler, Open);
+            TestStartup.Forget(profiler, category);
+        }
+    }
+
     [Test]
     public static void AnEventIsNamedByItsTextWhenTheKeyTranslates() =>
         Expect.AreEqual(
